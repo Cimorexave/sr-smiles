@@ -32,7 +32,7 @@ ORGANIC_SUBSET = {
 
 @enum.unique
 class TokenType(enum.Enum):
-    """Possible SMILES token types"""
+    """Possible SMILES token types."""
 
     ATOM = 1
     BOND_TYPE = 2
@@ -45,16 +45,17 @@ class TokenType(enum.Enum):
 
 
 def _tokenize(smiles: str) -> Iterator[tuple[TokenType, int, str | int]]:
-    """
-    Tokenizes a CGR SMILES string based on your specific rules,
-    including recognition of {reac|prod} blocks.
+    """Tokenize a SMILES string into atoms, bonds, branches, and stereochemistry.
+
+    Recognizes standard organic atoms, bond types, ring numbers, branching,
+    cis/trans stereochemistry, and `{reac|prod}` blocks.
 
     Args:
-        smiles: The CGR SMILES string to tokenize.
+        smiles (str): The SMILES string to tokenize.
 
     Yields:
-        Tuple[TokenType, int, Union[str, int]]:
-            (token_type, original_index_in_string, token_value)
+        Iterator[tuple[TokenType, int, str | int]]: Tuples of
+            (token_type, original_index_in_string, token_value).
     """
     s_iter = iter(smiles)
     token = ""
@@ -117,8 +118,7 @@ def _tokenize(smiles: str) -> Iterator[tuple[TokenType, int, str | int]]:
 
 
 def remove_atom_mapping(rxn_smiles: str) -> str:
-    """
-    Removes atom mapping numbers from a reaction SMILES string.
+    """Removes atom mapping numbers from a reaction SMILES string.
 
     Args:
         rxn_smiles (str): A reaction SMILES string with atom mappings.
@@ -137,8 +137,7 @@ def remove_atom_mapping(rxn_smiles: str) -> str:
 
 
 def remove_redundant_square_brackets(rxn_smiles: str) -> str:
-    """
-    Removes only the redundant square brackets in a reaction SMILES string.
+    """Removes only the redundant square brackets in a reaction SMILES string.
 
     Redundant square brackets are those that enclose uncharged, non-chiral atoms from
     the organic subset. For example, [C] becomes C, while brackets are retained for
@@ -150,9 +149,7 @@ def remove_redundant_square_brackets(rxn_smiles: str) -> str:
     Returns:
         str: Reaction SMILES string with unnecessary square brackets removed.
     """
-    escaped_subset = [
-        re.escape(elem) for elem in sorted(ORGANIC_SUBSET, key=len, reverse=True)
-    ]
+    escaped_subset = [re.escape(elem) for elem in sorted(ORGANIC_SUBSET, key=len, reverse=True)]
     pattern = rf"\[({'|'.join(escaped_subset)})\]"
 
     def replacer(match):
@@ -161,99 +158,8 @@ def remove_redundant_square_brackets(rxn_smiles: str) -> str:
     return re.sub(pattern, replacer, rxn_smiles)
 
 
-# def remove_non_participating_hydrogens(reaction_smiles: str) -> str:
-#     # TODO: currently, this only removes hydrogens, when atom mappings are removed!!
-#     # which doesn't make sense, because how can we then map a hydrogen and tell
-#     # if it is participating in the reaction or not.
-#     # TODO: Another problem, we don't actually identify participating hydrogens. We just skip
-#     # reaction SMILES if they are unbalanced, otherwise we sub all the patterns listed below.
-#     """
-#     Removes explicit hydrogens that are not participating in the reaction from a reaction SMILES,
-#     while preserving atom order and structure.
-
-#     Assumes a reaction SMILES without atom mapping.
-
-#     Args:
-#         reaction_smiles (str): A reaction SMILES string in the form 'reactants>>products'.
-
-#     Returns:
-#         str: A modified reaction SMILES with non-essential explicit hydrogens removed,
-#              or the original input if H counts differ or parsing fails.
-#     """
-#     try:
-#         reactants_smiles, products_smiles = reaction_smiles.split(">>")
-
-#         # parse reactants and products to get H counts
-#         reactants_mol = Chem.MolFromSmiles(reactants_smiles)
-#         products_mol = Chem.MolFromSmiles(products_smiles)
-
-#         if reactants_mol is None or products_mol is None:
-#             return reaction_smiles
-
-#         # get molecular formulas to check if H count changes
-#         reactants_formula = rdMolDescriptors.CalcMolFormula(reactants_mol)
-#         products_formula = rdMolDescriptors.CalcMolFormula(products_mol)
-
-#         # extract hydrogen counts
-#         def get_h_count(formula):
-#             h_match = re.search(r"H(\d*)", formula)
-#             if h_match:
-#                 return int(h_match.group(1)) if h_match.group(1) else 1
-#             return 0
-
-#         reactants_h = get_h_count(reactants_formula)
-#         products_h = get_h_count(products_formula)
-
-#         # if hydrogen count changes, keep explicit H"s that might be involved
-#         if reactants_h != products_h:
-#             print(f"H count changes: {reactants_h} -> {products_h}, keeping explicit H's")
-#             return reaction_smiles
-
-#         # if H count is conserved, remove non-essential explicit H"s using regex
-#         # this preserves atom order unlike RDKit canonicalization
-#         def clean_component_preserve_order(smiles):
-#             result = smiles
-
-#             # fixed patterns - remove the overly restrictive lookaheads
-#             safe_patterns = [
-#                 (r"\[CH3\]", "[C]"),  # [CH3] -> C
-#                 (r"\[CH2\]", "[C]"),  # [CH2] -> C
-#                 (r"\[CH\]", "[C]"),  # [CH] -> C (removed the (?![0-9]))
-#                 (r"\[C\]", "[C]"),  # [C] -> C (removed the (?![0-9]))
-#                 (r"\[OH2\](?![+-])", "[O]"),
-#                 (r"\[OH\](?![+-])", "[O]"),
-#                 (r"\[O\](?![+-])", "[O]"),
-#                 (r"\[NH3\](?![+-])", "[N]"),
-#                 (r"\[NH2\](?![+-])", "[N]"),
-#                 (r"\[NH\](?![+-])", "[N]"),
-#                 (r"\[N\](?![+-])", "[N]"),
-#                 (r"\[SH2\](?![+-])", "[S]"),
-#                 (r"\[SH\](?![+-])", "[S]"),
-#                 (r"\[S\](?![+-])", "[S]"),
-#             ]
-
-#             for pattern, replacement in safe_patterns:
-#                 result = re.sub(pattern, replacement, result)
-
-#             return result
-
-#         # process reactants and products while preserving order
-#         reactant_components = [clean_component_preserve_order(r.strip()) for r in reactants_smiles.split(".")]
-#         clean_reactants = ".".join([r for r in reactant_components if r])
-
-#         product_components = [clean_component_preserve_order(p.strip()) for p in products_smiles.split(".")]
-#         clean_products = ".".join([p for p in product_components if p])
-
-#         return f"{clean_reactants}>>{clean_products}"
-
-#     except Exception as e:
-#         print(f"Error processing reaction: {e}, reaction={reaction_smiles}")
-#         return reaction_smiles
-
-
 def parse_bonds_in_order_from_smiles(smiles: str) -> dict[tuple[int, int], str]:
-    """
-    Parses SMILES to map bond atom-map pairs to their bond specifiers.
+    """Parses SMILES to map bond atom-map pairs to their bond specifiers.
 
     This function traverses the SMILES token by token, identifying bonds by
     their connecting atom map numbers and extracting their explicit bond type.
@@ -263,7 +169,7 @@ def parse_bonds_in_order_from_smiles(smiles: str) -> dict[tuple[int, int], str]:
 
     Returns:
         dict[tuple[int, int], str]: A dict mapping sorted `(atom_map_num_1, atom_map_num_2)`
-        tuples to their bond specifier string.
+            tuples to their bond specifier string.
 
     Raises:
         ValueError: If the CGR SMILES string has malformed syntax.
@@ -282,9 +188,7 @@ def parse_bonds_in_order_from_smiles(smiles: str) -> dict[tuple[int, int], str]:
             # Extract atom map number or assign a temporary one if none.
             atom_map_match = re.search(r":(\d+)", str(token_val))
             current_atom_map_num = (
-                int(atom_map_match.group(1))
-                if atom_map_match
-                else (current_logical_idx + 1000)
+                int(atom_map_match.group(1)) if atom_map_match else (current_logical_idx + 1000)
             )
 
             logical_idx_to_map_num[current_logical_idx] = current_atom_map_num
@@ -298,17 +202,13 @@ def parse_bonds_in_order_from_smiles(smiles: str) -> dict[tuple[int, int], str]:
 
                 # Determine the bond specification
                 # If next_bond_specifier is None, it implies a single bond by default.
-                bond_val = (
-                    next_bond_specifier if next_bond_specifier is not None else "-"
-                )
+                bond_val = next_bond_specifier if next_bond_specifier is not None else "-"
 
                 # Store the bond
                 replace_dict_bonds[bond_map_num_pair] = bond_val
 
             current_logical_idx += 1
-            anchor_logical_idx = (
-                current_logical_idx - 1
-            )  # This new atom becomes the anchor for next bond
+            anchor_logical_idx = current_logical_idx - 1  # This new atom becomes the anchor for next bond
             next_bond_specifier = None  # Clear any pending bond specifier
 
         elif tokentype == TokenType.BOND_TYPE or tokentype == TokenType.EZSTEREO:
@@ -320,23 +220,19 @@ def parse_bonds_in_order_from_smiles(smiles: str) -> dict[tuple[int, int], str]:
 
         elif tokentype == TokenType.BRANCH_END:
             if not branches:
-                raise ValueError(
-                    f"Unmatched ')' in SMILES string at index {token_original_idx}"
-                )
+                raise ValueError(f"Unmatched ')' in SMILES string at index {token_original_idx}")
             anchor_logical_idx = branches.pop()  # Pop anchor from stack
-            next_bond_specifier = None  # Branch closure typically implies implicit single bond if no explicit one.
+            next_bond_specifier = (
+                None  # Branch closure typically implies implicit single bond if no explicit one.
+            )
 
         elif tokentype == TokenType.RING_NUM:
             ring_num_val = str(token_val)  # Ring numbers can be int or string (for %XX)
 
-            if (
-                ring_num_val in ring_open_bonds
-            ):  # Ring closure (we found a matching number)
-                logical_idx_opener, bond_opener_specifier = ring_open_bonds[
-                    ring_num_val
-                ]
+            if ring_num_val in ring_open_bonds:  # Ring closure (we found a matching number)
+                logical_idx_opener, bond_opener_specifier = ring_open_bonds[ring_num_val]
 
-                # Bond is between the current atom (which is anchor_logical_idx) and the atom that opened the ring
+                # Bond is between the current atom (anchor_logical_idx) and the atom that opened the ring
                 bond_map_num_pair = (
                     logical_idx_to_map_num[anchor_logical_idx],
                     logical_idx_to_map_num[logical_idx_opener],
@@ -348,11 +244,7 @@ def parse_bonds_in_order_from_smiles(smiles: str) -> dict[tuple[int, int], str]:
                 bond_val = (
                     next_bond_specifier
                     if next_bond_specifier is not None
-                    else (
-                        bond_opener_specifier
-                        if bond_opener_specifier is not None
-                        else "-"
-                    )
+                    else (bond_opener_specifier if bond_opener_specifier is not None else "-")
                 )
 
                 # Store the bond
@@ -372,16 +264,17 @@ def parse_bonds_in_order_from_smiles(smiles: str) -> dict[tuple[int, int], str]:
 
 
 def get_atom_map_adjacency_list_from_smiles(smi: str) -> dict[int, list[int]]:
-    """
-    Creates a dictionary mapping each atom map number to a list of adjacent atom map numbers,
-    reflecting the order in which bonds are encountered during the SMILES traversal.
+    """Creates a dictionary, mapping each atom map number to a list of adjacent map numbers.
+
+    The list of adjacent atom map numbers reflects the order in which bonds are encountered
+    during the SMILES traversal.
 
     Args:
         smi (str): A SMILES string with atom mapping.
 
     Returns:
         dict[int, list[int]]: A dictionary where keys are atom map numbers and values are
-        lists of adjacent atom map numbers, representing the molecular graph connectivity.
+            lists of adjacent atom map numbers, representing the molecular graph connectivity.
     """
     bonds = parse_bonds_in_order_from_smiles(smi)
     adj_dict = {}
@@ -397,23 +290,20 @@ def get_atom_map_adjacency_list_from_smiles(smi: str) -> dict[int, list[int]]:
 
 
 def extract_chiral_tag_by_atom_map_num(smiles: str, atom_map_num: int) -> str:
-    """
-    Extracts the chiral tag ('@' or '@@') for an atom in a SMILES string based on its atom map number.
+    """Extracts the chiral tag ("@" or "@@") for an atom in a SMILES string based on its atom map number.
 
     Args:
         smiles (str): A SMILES string where atoms may have chiral tags and mapping numbers.
         atom_map_num (int): The atom map number to search for within the SMILES.
 
     Returns:
-        str: The chiral tag associated with the atom (either '@', '@@', or an empty string if no tag is found).
+        str: The chiral tag associated with the atom (either "@", "@@", or "" if no tag is found).
 
     Example:
         >>> extract_chiral_tag_by_atom_map_num("[C@H:1](F)Cl", 1)
-        '@'
+        "@"
     """
-    atom_tokens = [
-        tok for tok_type, _, tok in _tokenize(smiles) if tok_type == TokenType.ATOM
-    ]
+    atom_tokens = [tok for tok_type, _, tok in _tokenize(smiles) if tok_type == TokenType.ATOM]
     for tok in atom_tokens:
         match = re.search(r":(\d+)\]", tok)
         if match:
@@ -428,7 +318,8 @@ def extract_chiral_tag_by_atom_map_num(smiles: str, atom_map_num: int) -> str:
 
 
 def update_all_atom_stereo(mol: Chem.Mol, smi: str, smi_ref: str) -> None:
-    """
+    """Updates the stereochemistry of chiral centers in a molecule.
+
     Updates the stereochemistry of chiral centers in a molecule based on changes in atom
     neighbor ordering between the original and refernce SMILES (e.g. a CGR-scaffold SMILES).
 
@@ -473,8 +364,7 @@ def update_all_atom_stereo(mol: Chem.Mol, smi: str, smi_ref: str) -> None:
 
 
 def flip_e_z_stereo(smiles: str) -> str:
-    """
-    Flips E/Z stereochemistry in a string by switching '/' and '\\' bond E/Z-stereochemistry markers.
+    r"""Flips E/Z stereochemistry in a string by switching '/' and '\\' bond E/Z-stereochemistry markers.
 
     Args:
         smiles (str): A SMILES string that may contain E/Z stereochemistry indicators ('/' or '\\').
@@ -494,8 +384,7 @@ def flip_e_z_stereo(smiles: str) -> str:
 
 
 def is_num_permutations_even(l1: list, l2: list) -> bool:
-    """
-    Determines if the permutation required to transform list `l1` into list `l2` involves an even number of swaps.
+    """Determines if the permutation to transform list `l1` into `l2` involves an even min number of swaps.
 
     Args:
         l1 (list): The original list of elements.
@@ -524,8 +413,7 @@ def is_num_permutations_even(l1: list, l2: list) -> bool:
 
 
 def common_elements_preserving_order(list1: list, list2: list) -> tuple[list, list]:
-    """
-    Returns the common elements between two lists, preserving the order of each original list.
+    """Returns the common elements between two lists, preserving the order of each original list.
 
     Args:
         list1 (list): The first list of elements.
@@ -543,8 +431,7 @@ def common_elements_preserving_order(list1: list, list2: list) -> tuple[list, li
 
 
 def includes_individually_mapped_hydrogens(smiles: str) -> bool:
-    """
-    Check if a SMILES string includes individually mapped hydrogens, e.g., [H:2].
+    """Check if a SMILES string includes individually mapped hydrogens, e.g., [H:2].
 
     Args:
         smiles (str): The SMILES string to check.
@@ -567,13 +454,12 @@ def includes_individually_mapped_hydrogens(smiles: str) -> bool:
 
 
 def make_mol(smi: str, sanitize: bool = True) -> Chem.Mol:
-    """
-    Creates an RDKit molecule object from a SMILES string, with optional sanitization.
+    """Creates an RDKit molecule object from a SMILES string, with optional sanitization.
 
     Args:
         smi (str): A SMILES string representing the molecule.
-        sanitize (bool, optional): Whether to sanitize the molecule after parsing.
-            Defaults to True. Sanitization applies all standard checks except hydrogen adjustment.
+        sanitize (bool, optional): Whether to sanitize the molecule after parsing. Defaults to True.
+            Sanitization applies all standard checks except hydrogen adjustment.
 
     Returns:
         Chem.Mol: An RDKit molecule object constructed from the SMILES string.
@@ -585,8 +471,7 @@ def make_mol(smi: str, sanitize: bool = True) -> Chem.Mol:
     if sanitize:
         Chem.SanitizeMol(
             mol,
-            sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL
-            ^ Chem.SanitizeFlags.SANITIZE_ADJUSTHS,
+            sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL ^ Chem.SanitizeFlags.SANITIZE_ADJUSTHS,
         )
     Chem.AssignStereochemistry(mol)
 
@@ -603,16 +488,13 @@ def make_mol(smi: str, sanitize: bool = True) -> Chem.Mol:
         # record which atoms had explicit H
         mol.UpdatePropertyCache(strict=False)
         nH_atoms = {
-            atom.GetIdx()
-            for atom in mol.GetAtoms()
-            if atom.GetSymbol() == "N" and atom.GetTotalNumHs() > 0
+            atom.GetIdx() for atom in mol.GetAtoms() if atom.GetSymbol() == "N" and atom.GetTotalNumHs() > 0
         }
 
         if sanitize:
             Chem.SanitizeMol(
                 mol,
-                sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL
-                ^ Chem.SanitizeFlags.SANITIZE_ADJUSTHS,
+                sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL ^ Chem.SanitizeFlags.SANITIZE_ADJUSTHS,
             )
         Chem.AssignStereochemistry(mol)
 
@@ -627,8 +509,7 @@ def make_mol(smi: str, sanitize: bool = True) -> Chem.Mol:
 
 
 def canonicalize(rxn_smi: str) -> Chem.Mol:
-    """
-    Converts a reaction SMILES string into its canonical form for both reactants and products.
+    """Converts a reaction SMILES string into its canonical form for both reactants and products.
 
     Args:
         rxn_smi (str): A reaction SMILES string formatted as "reactants>>products".
@@ -645,29 +526,23 @@ def canonicalize(rxn_smi: str) -> Chem.Mol:
 
 
 def map_reac_to_prod(mol_reac: Chem.Mol, mol_prod: Chem.Mol) -> dict[int, int]:
-    """
-    Creates a mapping from reactant atom indices to product atom indices based on atom mapping numbers.
+    """Creates mapping from reactant atom indices to product atom indices based on atom mapping numbers.
 
     Args:
         mol_reac (Chem.Mol): RDKit molecule object for the reactants, with atom mapping numbers.
         mol_prod (Chem.Mol): RDKit molecule object for the products, with atom mapping numbers.
 
     Returns:
-        dict[int, int]: A dictionary mapping reactant atom indices (keys) to corresponding product atom indices (values).
+        dict[int, int]: A dictionary mapping reactant atom indices (keys) to corresponding product atom
+            indices (values).
     """
-    prod_map_to_id = {
-        atom.GetAtomMapNum(): atom.GetIdx() for atom in mol_prod.GetAtoms()
-    }
-    reac_id_to_prod_id = {
-        atom.GetIdx(): prod_map_to_id[atom.GetAtomMapNum()]
-        for atom in mol_reac.GetAtoms()
-    }
+    prod_map_to_id = {atom.GetAtomMapNum(): atom.GetIdx() for atom in mol_prod.GetAtoms()}
+    reac_id_to_prod_id = {atom.GetIdx(): prod_map_to_id[atom.GetAtomMapNum()] for atom in mol_reac.GetAtoms()}
     return reac_id_to_prod_id
 
 
 def get_atom_map_num(mol: Chem.Mol, atom_idx: int) -> int:
-    """
-    Retrieves the atom mapping number for a specified atom in an RDKit molecule.
+    """Retrieves the atom mapping number for a specified atom in an RDKit molecule.
 
     Args:
         mol (Chem.Mol): The RDKit molecule.
@@ -686,8 +561,7 @@ def get_atom_map_num(mol: Chem.Mol, atom_idx: int) -> int:
 
 
 def get_atom_map_num_of_mol(mol: Chem.Mol) -> list[int]:
-    """
-    Retrieves the atom map numbers of all atoms in an RDKit molecule.
+    """Retrieves the atom map numbers of all atoms in an RDKit molecule.
 
     Args:
         mol (Chem.Mol): The RDKit molecule.
@@ -700,8 +574,7 @@ def get_atom_map_num_of_mol(mol: Chem.Mol) -> list[int]:
 
 
 def get_atom_by_map_num(mol: Chem.Mol, atom_map_num: int) -> Optional[Chem.Atom]:
-    """
-    Retrieve the atom from the molecule that has the specified atom map number.
+    """Retrieve the atom from the molecule that has the specified atom map number.
 
     Args:
         mol (Chem.Mol): The RDKit molecule to search.
@@ -718,8 +591,7 @@ def get_atom_by_map_num(mol: Chem.Mol, atom_map_num: int) -> Optional[Chem.Atom]
 
 
 def get_list_of_atom_map_numbers(smi: str) -> list[str]:
-    """
-    Extract all atom map numbers from a SMILES string in traversal order.
+    """Extract all atom map numbers from a SMILES string in traversal order.
 
     Args:
         smi (str): A SMILES string potentially containing atom map numbers.
@@ -734,14 +606,13 @@ def get_list_of_atom_map_numbers(smi: str) -> list[str]:
 
 
 def get_atom_indices_and_smarts(mol: Chem.Mol) -> list[tuple[int, str]]:
-    """
-    Extract each atom's index and its corresponding SMARTS representation from the molecule.
+    """Extract each atom's index and its corresponding SMARTS representation from the molecule.
 
     Args:
         mol (Chem.Mol): The molecule to process.
 
     Returns:
-        list[tuple[int, str]]: A list of tuples where each tuple contains an atom's index and its SMARTS string.
+        list[tuple[int, str]]: A list of tuples where each contains an atom's index and its SMARTS string.
     """
     num_atoms = mol.GetNumAtoms()
     atom_indices = [
@@ -751,9 +622,8 @@ def get_atom_indices_and_smarts(mol: Chem.Mol) -> list[tuple[int, str]]:
     return atom_indices
 
 
-def get_bond_idx(mol: Chem.Mol, atom_idx1: int, atom_idx2: int) -> int:
-    """
-    Get the bond index between two atoms in a molecule.
+def get_bond_idx(mol: Chem.Mol, atom_idx1: int, atom_idx2: int) -> int | None:
+    """Get the bond index between two atoms in a molecule.
 
     Args:
         mol (Chem.Mol): The molecule containing the atoms.

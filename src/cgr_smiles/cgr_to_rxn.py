@@ -15,18 +15,17 @@ from cgr_smiles.utils import (
 
 
 def parse_bonds_from_smiles(smiles: str) -> dict[tuple[int, int], str]:
-    """
-    Parses SMILES to map bond atom-map pairs to their bond specifiers.
+    """Parses SMILES to map bond atom-map pairs to their bond specifiers.
 
     This function traverses the SMILES token by token, identifying bonds by
     their connecting atom map numbers and extracting their explicit bond type.
 
     Args:
-        smiles: SMILES string of a molecule.
+        smiles (str): SMILES string of a molecule.
 
     Returns:
-        A dictionary mapping sorted `(atom_map_num_1, atom_map_num_2)` tuples
-        to their bond specifier string.
+        dict[tuple[int, int], str]: A dictionary mapping sorted `(atom_map_num_1, atom_map_num_2)`
+            tuples to their bond specifier string.
 
     Raises:
         ValueError: If the CGR SMILES string has malformed syntax.
@@ -42,18 +41,16 @@ def parse_bonds_from_smiles(smiles: str) -> dict[tuple[int, int], str]:
 
     for tokentype, token_original_idx, token_val in _tokenize(smiles):
         if tokentype == TokenType.ATOM:
-            # Extract atom map number or assign a temporary one if none.
+            # extract atom map number or assign a temporary one if none.
             atom_map_match = re.search(r":(\d+)", str(token_val))
             current_atom_map_num = (
-                int(atom_map_match.group(1))
-                if atom_map_match
-                else (current_logical_idx + 1000)
+                int(atom_map_match.group(1)) if atom_map_match else (current_logical_idx + 1000)
             )
 
             logical_idx_to_map_num[current_logical_idx] = current_atom_map_num
 
             if anchor_logical_idx is not None:
-                # We have a bond between anchor_logical_idx and current_logical_idx
+                # we have a bond between anchor_logical_idx and current_logical_idx
                 bond_map_num_pair = (
                     logical_idx_to_map_num[anchor_logical_idx],
                     current_atom_map_num,
@@ -61,45 +58,33 @@ def parse_bonds_from_smiles(smiles: str) -> dict[tuple[int, int], str]:
 
                 # Determine the bond specification
                 # If next_bond_specifier is None, it implies a single bond by default.
-                bond_val = (
-                    next_bond_specifier if next_bond_specifier is not None else "-"
-                )
-
-                # Store the bond
+                bond_val = next_bond_specifier if next_bond_specifier is not None else "-"
                 replace_dict_bonds[bond_map_num_pair] = bond_val
 
             current_logical_idx += 1
-            anchor_logical_idx = (
-                current_logical_idx - 1
-            )  # This new atom becomes the anchor for next bond
+            anchor_logical_idx = current_logical_idx
             next_bond_specifier = None  # Clear any pending bond specifier
 
         elif tokentype == TokenType.BOND_TYPE or tokentype == TokenType.EZSTEREO:
-            # These are standard bond types (-,=,#,: or E/Z stereo)
+            # These are standard bond types (-, =, #, : or E/Z stereo)
             next_bond_specifier = str(token_val)
 
         elif tokentype == TokenType.BRANCH_START:
-            branches.append(anchor_logical_idx)  # Push current anchor onto stack
+            branches.append(anchor_logical_idx)
 
         elif tokentype == TokenType.BRANCH_END:
             if not branches:
-                raise ValueError(
-                    f"Unmatched ')' in SMILES string at index {token_original_idx}"
-                )
-            anchor_logical_idx = branches.pop()  # Pop anchor from stack
-            next_bond_specifier = None  # Branch closure typically implies implicit single bond if no explicit one.
+                raise ValueError(f"Unmatched ')' in SMILES string at index {token_original_idx}")
+            anchor_logical_idx = branches.pop()
+            next_bond_specifier = None
 
         elif tokentype == TokenType.RING_NUM:
-            ring_num_val = str(token_val)  # Ring numbers can be int or string (for %XX)
+            ring_num_val = str(token_val)
 
-            if (
-                ring_num_val in ring_open_bonds
-            ):  # Ring closure (we found a matching number)
-                logical_idx_opener, bond_opener_specifier = ring_open_bonds[
-                    ring_num_val
-                ]
+            if ring_num_val in ring_open_bonds:  # found a matching ring closer
+                logical_idx_opener, bond_opener_specifier = ring_open_bonds[ring_num_val]
 
-                # Bond is between the current atom (which is anchor_logical_idx) and the atom that opened the ring
+                # Bond is between the current atom (anchor_logical_idx) and the atom that opened the ring
                 bond_map_num_pair = (
                     logical_idx_to_map_num[anchor_logical_idx],
                     logical_idx_to_map_num[logical_idx_opener],
@@ -111,14 +96,9 @@ def parse_bonds_from_smiles(smiles: str) -> dict[tuple[int, int], str]:
                 bond_val = (
                     next_bond_specifier
                     if next_bond_specifier is not None
-                    else (
-                        bond_opener_specifier
-                        if bond_opener_specifier is not None
-                        else "-"
-                    )
+                    else (bond_opener_specifier if bond_opener_specifier is not None else "-")
                 )
 
-                # Store the bond
                 replace_dict_bonds[bond_map_num_pair] = bond_val
 
                 del ring_open_bonds[ring_num_val]  # Remove from open rings
@@ -134,20 +114,17 @@ def parse_bonds_from_smiles(smiles: str) -> dict[tuple[int, int], str]:
     return replace_dict_bonds
 
 
-def remove_bonds_by_atom_map_nums(
-    mol: Chem.Mol, atom_map_pairs: list[tuple[int, int]]
-) -> Chem.Mol:
-    """
-    Removes specified bonds from an RDKit molecule based on atom map numbers.
+def remove_bonds_by_atom_map_nums(mol: Chem.Mol, atom_map_pairs: list[tuple[int, int]]) -> Chem.Mol:
+    """Removes specified bonds from an RDKit molecule based on atom map number pairs.
 
     Args:
-        mol: The input RDKit molecule object.
-        atom_map_pairs: A list of atom map tuples to be removed.
+        mol (Chem.Mol): The input RDKit molecule object.
+        atom_map_pairs (list[tuple[int, int]]): A list of atom map tuples to be removed.
 
     Returns:
-        A new RDKit molecule object with the specified bonds removed.
-        If a bond corresponding to a given pair of atom map numbers does not exist,
-        a warning is printed, and that pair is skipped.
+        Chem.Mol: A new RDKit molecule object with the specified bonds removed.
+            If a bond corresponding to a given pair of atom map numbers does not exist,
+            a warning is printed, and that pair is skipped.
 
     """
     atom_map_to_idx = {}
@@ -165,9 +142,7 @@ def remove_bonds_by_atom_map_nums(
         if bond:
             bonds_to_remove_by_idx.append((idx1, idx2))
         else:
-            print(
-                f"Warning: No bond found between atom map numbers {am1} and {am2}. Skipping removal."
-            )
+            print(f"Warning: No bond found between atom map numbers {am1} and {am2}. Skipping removal.")
 
     for idx1, idx2 in bonds_to_remove_by_idx:
         emol.RemoveBond(idx1, idx2)
@@ -176,11 +151,8 @@ def remove_bonds_by_atom_map_nums(
     return final_mol
 
 
-def update_chirality_tags(
-    smiles: str, cgr_scaffold: str, chiral_center_map_nums: list[int]
-) -> str:
-    """
-    Updates chirality tags in a SMILES string based on a CGR scaffold.
+def update_chirality_tags(smiles: str, cgr_scaffold: str, chiral_center_map_nums: list[int]) -> str:
+    """Updates chirality tags in a SMILES string based on a CGR scaffold.
 
     Identifies chiral centers in the provided RDKit molecule (`mol`) by their atom
     map numbers. It then compares the neighborhood of these chiral centers in
@@ -189,9 +161,9 @@ def update_chirality_tags(
     between the SMILES and scaffold, the tag is flipped.
 
     Args:
-        smiles: The input SMILES string of the molecule.
-        cgr_scaffold: A reference CGR SMILES string containing correct chirality
-                      information for comparison.
+        smiles (str): The input SMILES string of the molecule.
+        cgr_scaffold (list[int]): A reference CGR SMILES string containing correct chirality
+            information for comparison.
         chiral_center_map_nums: List of the atom map numbers of the chiral centers.
 
     Returns:
@@ -209,9 +181,7 @@ def update_chirality_tags(
             if map_num in chiral_center_map_nums:
                 reac_nbrs = reac_adj[map_num]
                 cgr_nbrs = cgr_adj[map_num]
-                reac_nbrs, cgr_nbrs = common_elements_preserving_order(
-                    reac_nbrs, cgr_nbrs
-                )
+                reac_nbrs, cgr_nbrs = common_elements_preserving_order(reac_nbrs, cgr_nbrs)
 
                 current_tag = extract_chiral_tag_by_atom_map_num(cgr_scaffold, map_num)
 
@@ -224,9 +194,7 @@ def update_chirality_tags(
                         chirality_tag = "@"
 
                 replace_pattern = rf"(\[[A-Z][a-z]?)(@{{1,2}})?(:{map_num}\])"
-                reac_tokens[i][1] = re.sub(
-                    replace_pattern, rf"\1{chirality_tag}\3", reac_tokens[i][1]
-                )
+                reac_tokens[i][1] = re.sub(replace_pattern, rf"\1{chirality_tag}\3", reac_tokens[i][1])
 
     return "".join([str(tok[1]) for tok in reac_tokens])
 
@@ -234,7 +202,7 @@ def update_chirality_tags(
 def find_cis_trans_stereo_bonds(
     bond_dict: dict[tuple[int, int], str],
 ) -> dict[tuple[int, int], dict[str, any]]:
-    """Identifies cis/trans stereochemistry of double bonds from bond data.
+    r"""Identifies cis/trans stereochemistry of double bonds from bond data.
 
     Parses a dictionary representing molecule bonds and their types. It identifies
     double bonds and determines their cis/trans stereochemistry by examining
@@ -242,17 +210,17 @@ def find_cis_trans_stereo_bonds(
     double bond atoms.
 
     Args:
-        bond_dict: A dictionary where keys are tuples of atom indices, and values
-                   are strings indicating the bond type.
+        bond_dict (dict[tuple[int, int], str]): A dictionary where keys are tuples of atom indices,
+            and values are strings indicating the bond type.
 
     Returns:
-        A dictionary where keys are tuples of atom indices `(atom_idx_a, atom_idx_b)`
-        representing the double bond, and values are dictionaries containing:
-        - "stereo": An RDKit `Chem.BondStereo` enum value (STEREOCIS or STEREOTRANS).
-        - "terminal_atoms": A tuple of the two atom indices `(neighbor_atom_c_idx, neighbor_atom_d_idx)`
-                            that define the stereochemistry for each side of the double bond.
-                            The dictionary contains entries for both `(a, b)` and `(b, a)`
-                            for the same double bond.
+        dict[tuple[int, int], dict[str, any]: A dictionary where keys are tuples of atom indices
+            `(idx_a, idx_b)` representing the double bond, and values are dictionaries containing:
+                - "stereo": An RDKit `Chem.BondStereo` enum value (STEREOCIS or STEREOTRANS).
+                - "terminal_atoms": A tuple of the two atom indices `(neighbor_a_idx, neighbor_b_idx)`
+                    that define the stereochemistry for each side of the double bond.
+                    The dictionary contains entries for both `(a, b)` and `(b, a)` for the same
+                    double bond.
     """
     if not bond_dict:
         return {}
@@ -275,9 +243,6 @@ def find_cis_trans_stereo_bonds(
 
     for db_pair in double_bonds:
         atom_a, atom_b = tuple(db_pair)
-
-        # stereo_arms_a = [(a, n, stereo_bonds[(a, n)]) for n, bt in neighbors[a] if (a, n) in stereo_bonds]
-        # stereo_arms_b = [(b, n, stereo_bonds[(b, n)]) for n, bt in neighbors[b] if (b, n) in stereo_bonds]
 
         stereo_arms_a = []
         for neighbor_atom_a, _ in neighbors_map.get(atom_a, []):
@@ -302,41 +267,45 @@ def find_cis_trans_stereo_bonds(
                 )
 
         if stereo_arms_a and stereo_arms_b:
-            arm_a = stereo_arms_a[0]  # (atom_a, neighbor_c, slash_type_a)
-            arm_b = stereo_arms_b[0]  # (atom_b, neighbor_d, slash_type_b)
+            arm_a = stereo_arms_a[0]
+            arm_b = stereo_arms_b[0]
 
-            neighbor_c, slash_type_a = arm_a[1], flip_e_z_stereo(arm_a[2])
-            neighbor_d, slash_type_b = arm_b[1], arm_b[2]
+            neighbor_a, slash_type_a = arm_a[1], flip_e_z_stereo(arm_a[2])
+            neighbor_b, slash_type_b = arm_b[1], arm_b[2]
 
             if slash_type_a == slash_type_b:
-                stereo = Chem.BondStereo.STEREOE  # Chem.BondStereo.STEREOTRANS
+                stereo = Chem.BondStereo.STEREOE
             else:
-                stereo = Chem.BondStereo.STEREOZ  # Chem.BondStereo.STEREOCIS
+                stereo = Chem.BondStereo.STEREOZ
 
             results[(atom_a, atom_b)] = {
                 "stereo": stereo,
-                "terminal_atoms": (neighbor_c, neighbor_d),
+                "terminal_atoms": (neighbor_a, neighbor_b),
             }
             results[(atom_b, atom_a)] = {
                 "stereo": stereo,
-                "terminal_atoms": (neighbor_d, neighbor_c),
+                "terminal_atoms": (neighbor_b, neighbor_a),
             }
 
     return results
 
 
 def update_cis_trans_stereo_chem(mol: Chem.Mol, parsed_bonds: dict) -> Chem.Mol:
-    """
-    Updates cis/trans stereochemistry for double bonds in a molecule,
-    using pre-parsed bond and stereochemistry data.
+    """Update cis/trans stereochemistry for double bonds in a molecule.
+
+    This function uses pre-parsed bond and stereochemistry information to correct
+    the cis/trans configuration of double bonds in an RDKit molecule. Atom map numbers
+    are preserved, and stereochemistry is updated according to the provided bond data.
 
     Args:
-        mol (rdkit.Chem.Mol): RDKit molecule with atom map numbers.
-        parsed_bonds (dict): Dictionary with bond keys (am1, am2) and values including
-                             'terminal_atoms' (tuple of atom map nums) and 'stereo' (RDKit stereo enum).
+        mol (Chem.Mol): An RDKit molecule object with atom map numbers.
+        parsed_bonds (dict): A dictionary where keys are bond identifiers (tuple of atom map numbers),
+            and values are dictionaries containing:
+                - 'terminal_atoms' (tuple[int, int]): The atom map numbers of the bond ends.
+                - 'stereo' (Chem.rdchem.BondStereo): The desired stereochemistry for the bond.
 
     Returns:
-        rdkit.Chem.Mol: Molecule with updated stereochemistry.
+        Chem.Mol: The input molecule with updated cis/trans stereochemistry on relevant bonds.
     """
     b = find_cis_trans_stereo_bonds(parsed_bonds)
 
@@ -374,8 +343,7 @@ def update_cis_trans_stereo_chem(mol: Chem.Mol, parsed_bonds: dict) -> Chem.Mol:
 
 
 def get_reac_prod_scaffold_smiles_from_cgr(cgr_smiles: str) -> tuple[str, str]:
-    """
-    Extracts the reactant and product scaffold SMILES from a CGR SMILES string.
+    """Extracts the reactant and product scaffold SMILES from a CGR SMILES string.
 
     The CGR SMILES encodes atom-level differences between reactants and products using
     substitution patterns in the form `{reactant|product}`.
@@ -387,7 +355,7 @@ def get_reac_prod_scaffold_smiles_from_cgr(cgr_smiles: str) -> tuple[str, str]:
 
     Returns:
         tuple[str, str]: A tuple containing the reactant SMILES and product SMILES
-                         with all substitution patterns resolved.
+            with all substitution patterns resolved.
     """
     reac_smi = cgr_smiles
     prod_smi = cgr_smiles
@@ -414,11 +382,11 @@ def get_chiral_center_map_nums(mol: Chem.Mol) -> list[int]:
     """Returns the atom map numbers of chiral centers in an RDKit molecule.
 
     Args:
-        mol: The input RDKit molecule object.
+        mol (Chem.Mol): The input RDKit molecule object.
 
     Returns:
-        A list of integer atom map numbers corresponding to the chiral centers
-        found in the molecule.
+        list[int]: A list of integer atom map numbers corresponding to the chiral centers
+            found in the molecule.
     """
     atom_map_nums = []
     for atom in mol.GetAtoms():
@@ -431,6 +399,26 @@ def get_chiral_center_map_nums(mol: Chem.Mol) -> list[int]:
 
 
 def cgrsmiles_to_rxnsmiles(cgr_smiles: str) -> str:
+    """Converts a CGR SMILES string back into a reaction SMILES string.
+
+    This function reverses a Condensed Graph of Reaction (CGR) SMILES representation
+    into standard reaction SMILES (`reactants>>products`). It reconstructs reactant
+    and product molecules by removing unspecified bonds, updating stereochemistry,
+    and restoring chirality tags based on the CGR annotations.
+
+    Args:
+        cgr_smiles (str): A CGR SMILES string representing a reaction, where changes
+            between reactants and products are encoded using `{reac|prod}` syntax.
+
+    Returns:
+        str: The corresponding reaction SMILES string in the format "reactants>>products".
+
+    Notes:
+        - Each substitution pattern in the CGR SMILES should follow `{...|...}`.
+        - Unspecified bonds (labeled as "~") are removed in the resulting molecules.
+        - Stereochemistry and chirality tags are preserved and corrected during reconstruction.
+        - This function is the reverse transformation of `rxnsmiles_to_cgrsmiles`.
+    """
     # TODO: start with a validity check, especially that each substitution pattern follows `{...|...}`.
 
     # extract reac and prod smiles scaffold from cgr smiles
@@ -443,29 +431,21 @@ def cgrsmiles_to_rxnsmiles(cgr_smiles: str) -> str:
     reac_parsed_bonds = parse_bonds_from_smiles(reac_smi1)
     prod_parsed_bonds = parse_bonds_from_smiles(prod_smi1)
 
-    # extract the bond information of the unspecified bonds, as those are the ones we want to delete from the molecule.
-    reac_map_nums_unspecified_bonds = [
-        key for key, val in reac_parsed_bonds.items() if val == "~"
-    ]
-    prod_map_nums_unspecified_bonds = [
-        key for key, val in prod_parsed_bonds.items() if val == "~"
-    ]
+    # extract the bond information of the unspecified bonds (those we want to delete from the molecule)
+    reac_map_nums_unspecified_bonds = [key for key, val in reac_parsed_bonds.items() if val == "~"]
+    prod_map_nums_unspecified_bonds = [key for key, val in prod_parsed_bonds.items() if val == "~"]
 
     # then create the molecules from the smiles and manually remove the bonds that are labelled as unspecified
     reac_mol = Chem.MolFromSmiles(reac_smi1.replace("~", ""), sanitize=False)
     prod_mol = Chem.MolFromSmiles(prod_smi1.replace("~", ""), sanitize=False)
-    Chem.SanitizeMol(
-        prod_mol, Chem.SanitizeFlags.SANITIZE_ADJUSTHS
-    )  # TODO also for reac
-    Chem.SanitizeMol(
-        reac_mol, Chem.SanitizeFlags.SANITIZE_ADJUSTHS
-    )  # TODO also for reac
+    Chem.SanitizeMol(prod_mol, Chem.SanitizeFlags.SANITIZE_ADJUSTHS)  # TODO also for reac
+    Chem.SanitizeMol(reac_mol, Chem.SanitizeFlags.SANITIZE_ADJUSTHS)  # TODO also for reac
     reac_mol = remove_bonds_by_atom_map_nums(
         reac_mol, reac_map_nums_unspecified_bonds
     )  # smiles based patch needed while bug not fixed on rdkits end.
     prod_mol = remove_bonds_by_atom_map_nums(prod_mol, prod_map_nums_unspecified_bonds)
 
-    # update stereochem bonds / and \ (because apparently they get messed up along the way. this might not e neccessary anymore if previous bug gets fixed.)
+    # update stereochem bonds / and \ (because apparently they get messed up along the way. this might not be neccessary anymore if previous bug gets fixed.)  # noqa: E501
     reac_mol = update_cis_trans_stereo_chem(reac_mol, reac_parsed_bonds)
     prod_mol = update_cis_trans_stereo_chem(prod_mol, prod_parsed_bonds)
 
@@ -476,11 +456,7 @@ def cgrsmiles_to_rxnsmiles(cgr_smiles: str) -> str:
     reac_map_num_of_chiral_centers = get_chiral_center_map_nums(reac_mol)
     prod_map_num_of_chiral_centers = get_chiral_center_map_nums(prod_mol)
 
-    reac_smi4 = update_chirality_tags(
-        reac_smi3, cgr_reac_scaffold, reac_map_num_of_chiral_centers
-    )
-    prod_smi4 = update_chirality_tags(
-        prod_smi3, cgr_prod_scaffold, prod_map_num_of_chiral_centers
-    )
+    reac_smi4 = update_chirality_tags(reac_smi3, cgr_reac_scaffold, reac_map_num_of_chiral_centers)
+    prod_smi4 = update_chirality_tags(prod_smi3, cgr_prod_scaffold, prod_map_num_of_chiral_centers)
 
     return f"{reac_smi4}>>{prod_smi4}"

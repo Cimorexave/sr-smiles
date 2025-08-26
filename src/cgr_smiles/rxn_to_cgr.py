@@ -15,57 +15,67 @@ from cgr_smiles.utils import (
 
 
 def remove_redundant_brackets_and_hydrogens(cgr: str) -> str:
-    """
-    Clean a CGR-SMILES string by removing redundant square brackets and explicit hydrogens.
-    """
+    """Remove redundant square brackets and explicit hydrogens from a CGR-SMILES string.
 
+    This function cleans a CGR-SMILES string by removing brackets that contain only atoms
+    from the ORGANIC_SUBSET and by eliminating explicit hydrogen atoms where possible,
+    while preserving charges, isotopes, and other annotations.
+
+    Args:
+        cgr (str): A CGR-SMILES string potentially containing redundant brackets and explicit hydrogens.
+
+    Returns:
+        str: The cleaned CGR-SMILES string with redundant brackets and hydrogens removed.
+    """
     # Special explicit-H patterns first
     specials = {
-        # Carbon
         "CH4": "C",
         "CH3": "C",
         "CH2": "C",
         "CH": "C",
-        # Oxygen
+        "OH2": "O",
         "OH": "O",
-        # Nitrogen
+        "NH3": "N",
         "NH2": "N",
         "NH": "N",
         "nH": "n",
-        # Sulfur
+        "SH2": "S",
         "SH": "S",
         "sH": "s",
-        # Phosphorus
+        "PH3": "P",
         "PH2": "P",
         "PH": "P",
-        # Aromatic carbons
         "cH": "c",
     }
 
     def replace_bracketed(match):
         atom = match.group(1)
-        # Special cases like CH3, cH, OH
         if atom in specials:
             return specials[atom]
-        # Pure organic subset atoms (no isotope/charge/explicit H)
         if atom in ORGANIC_SUBSET:
             return atom
-        # Otherwise keep brackets
         return f"[{atom}]"
 
-    # Replace all [..] with cleaned version
+    # replace all [..] with cleaned version
     cgr = re.sub(r"\[([^\]]+)\]", replace_bracketed, cgr)
 
-    # Collapse {X|X} → X
+    # collapse {X|X} → X
     cgr = re.sub(r"\{([A-Za-z0-9@+\-]+)\|\1\}", r"\1", cgr)
 
     return cgr
 
 
 def remove_redundant_brackets(cgr: str) -> str:
-    """
-    Remove only redundant square brackets in a CGR-SMILES string.
-    Keeps explicit H, charges, isotopes, etc.
+    """Remove redundant square brackets from a CGR-SMILES string.
+
+    Only brackets containing atoms from the ORGANIC_SUBSET are removed.
+    Brackets that include explicit hydrogens, charges, isotopes, or other annotations are preserved.
+
+    Args:
+        cgr (str): A CGR-SMILES string potentially containing redundant brackets.
+
+    Returns:
+        str: The CGR-SMILES string with redundant brackets removed.
     """
 
     def replace_bracketed(match):
@@ -82,7 +92,7 @@ def remove_redundant_brackets(cgr: str) -> str:
 
 # TODO: do some checks according to our assumptions (atom mapping, balanced etc)
 # TODO: also make version that has the {..|..} for all atoms and bonds (not only those changing)
-# TODO: standardize atom order depending on unmapped reactants, then add mappings again. Make the cgr molecule from this canonicalized reactant molecule to get maximum reproducibility
+# TODO: standardize atom order depending on unmapped reactants, then add mappings again. Make the cgr molecule from this canonicalized reactant molecule to get maximum reproducibility  # noqa: E501
 # TODO: Make this also work for unbalanced rxns
 # DONE: als make unmapped version of the cgrsmiles
 def rxnsmiles_to_cgrsmiles(
@@ -91,8 +101,7 @@ def rxnsmiles_to_cgrsmiles(
     remove_brackets: bool = False,
     remove_hydrogens: bool = False,
 ) -> str:
-    """
-    Converts a reaction SMILES string into a Condensed Graph of Reaction (CGR) SMILES.
+    """Converts a reaction SMILES string into a Condensed Graph of Reaction (CGR) SMILES.
 
     A CGR SMILES encodes the transformation between reactant and product molecules
     as a single, compact string representation, where atoms and bonds are annotated to
@@ -100,8 +109,13 @@ def rxnsmiles_to_cgrsmiles(
 
     Args:
         rxn_smi (str): A reaction SMILES string in the format "reactant>>product".
-        keep_atom_mapping: If True, atom map numbers will be removed in the output
-                           CGR SMILES. Otherwise they will be retained (default).
+        keep_atom_mapping (bool): If True, atom map numbers will be removed in the
+            output CGR SMILES. Otherwise they will be retained (default).
+        remove_brackets (bool): If True, redundant square brackets will be removed
+            in the output CGR SMILES. Otherwise they will be kept (default).
+        remove_hydrogens (bool): If True, explicit hydrogens will be removed in the
+            output CGR SMILES. Otherwise they will be kept (default).
+
     Returns:
         str: A CGR SMILES string representing the reaction as a single molecule
         with annotations of changes using `{reac|prod}` syntax.
@@ -111,7 +125,9 @@ def rxnsmiles_to_cgrsmiles(
         - Requires balanced reactions.
 
     Example:
-        >>> rxn_smiles = "[C:1]([H:3])([H:4])([H:5])[H:6].[Cl:2][H:7]>>[C:1]([H:3])([H:4])([H:5])[Cl:2].[H:6][H:7]"
+        >>> smi_reac = "[C:1]([H:3])([H:4])([H:5])[H:6].[Cl:2][H:7]"
+        >>> smi_prod = "[C:1]([H:3])([H:4])([H:5])[Cl:2].[H:6][H:7]"
+        >>> rxn_smiles = f"{smi_reac}>>{smi_prod}"
         >>> rxnsmiles_to_cgrsmiles(rxn_smiles)
         "[C:1]1([H:3])([H:4])([H:5]){-|~}[H:6]{~|-}[H:7]{-|~}[Cl:2]{~|-}1"
 
@@ -146,38 +162,20 @@ def rxnsmiles_to_cgrsmiles(
                 unspecified_bonds.append((idx1, idx2))
 
     mol_cgr = mol_cgr.GetMol()
-    # bonds1 = [(b.GetBeginAtom().GetAtomMapNum(), b.GetEndAtom().GetAtomMapNum(), b.GetStereo(), ) for b in mol_cgr.GetBonds()]
-
     smi_cgr = Chem.MolToSmiles(mol_cgr, canonical=False)
-    # mol_cgr = Chem.MolFromSmiles(smi_cgr, sanitize=False)
     mol_cgr = make_mol(smi_cgr, sanitize=False)
-    # bonds2 = [(b.GetBeginAtom().GetAtomMapNum(), b.GetEndAtom().GetAtomMapNum(), b.GetStereo(), ) for b in mol_cgr.GetBonds()]
-
-    # d_cgr = get_atom_map_adjacency_list_from_mol(mol_cgr)
 
     # reorder reac and prod molecule so we get the relative stereochemistry tags right:
-    # TODO: by doing the reordering, we basically canonicalize and make it a non-injective maping from rxn_smi to cgr_smi
+    # TODO: by doing the reordering, we basically canonicalize and make it a non-injective mapping
     # TODO: maybe instead just align the mapping of the product with the one in the reactant
-    # bonds_prod_1 = [(b.GetBeginAtom().GetAtomMapNum(), b.GetEndAtom().GetAtomMapNum(), b.GetStereo(), ) for b in mol_prod.GetBonds()]
-    # atoms_prod_1 = [(a.GetAtomMapNum(), a.GetChiralTag(), a.GetSmarts(isomericSmiles=True)) for a in mol_prod.GetAtoms()]
-    prod_map_to_id = dict(
-        [(atom.GetAtomMapNum(), atom.GetIdx()) for atom in mol_prod.GetAtoms()]
-    )
+    prod_map_to_id = dict([(atom.GetAtomMapNum(), atom.GetIdx()) for atom in mol_prod.GetAtoms()])
     prod_reorder = [prod_map_to_id[a.GetAtomMapNum()] for a in mol_cgr.GetAtoms()]
     mol_prod = Chem.RenumberAtoms(mol_prod, prod_reorder)
     smi_prod = Chem.MolToSmiles(mol_prod, canonical=False)
-    # bonds_prod_2 = [(b.GetBeginAtom().GetAtomMapNum(), b.GetEndAtom().GetAtomMapNum(), b.GetStereo(), ) for b in mol_prod.GetBonds()]
-    # atoms_prod_2 = [(a.GetAtomMapNum(), a.GetChiralTag(), a.GetSmarts(isomericSmiles=True)) for a in mol_prod.GetAtoms()]
 
-    # bonds_reac_1 = [(b.GetBeginAtom().GetAtomMapNum(), b.GetEndAtom().GetAtomMapNum(), b.GetStereo(), ) for b in mol_reac.GetBonds()]
-    # atoms_reac_1 = [(a.GetAtomMapNum(), a.GetChiralTag(), a.GetSmarts(isomericSmiles=True)) for a in mol_reac.GetAtoms()]
-    reac_map_to_id = dict(
-        [(atom.GetAtomMapNum(), atom.GetIdx()) for atom in mol_reac.GetAtoms()]
-    )
+    reac_map_to_id = dict([(atom.GetAtomMapNum(), atom.GetIdx()) for atom in mol_reac.GetAtoms()])
     reac_reorder = [reac_map_to_id[a.GetAtomMapNum()] for a in mol_cgr.GetAtoms()]
     mol_reac = Chem.RenumberAtoms(mol_reac, reac_reorder)
-    # bonds_reac_2 = [(b.GetBeginAtom().GetAtomMapNum(), b.GetEndAtom().GetAtomMapNum(), b.GetStereo(), ) for b in mol_reac.GetBonds()]
-    # atoms_reac_2 = [(a.GetAtomMapNum(), a.GetChiralTag(), a.GetSmarts(isomericSmiles=True)) for a in mol_reac.GetAtoms()]
     smi_reac = Chem.MolToSmiles(mol_reac, canonical=False)
 
     update_all_atom_stereo(mol_reac, smi_reac, smi_cgr)
@@ -194,9 +192,7 @@ def rxnsmiles_to_cgrsmiles(
         prod_smarts = atom_prod.GetSmarts(isomericSmiles=True)
 
         if reac_smarts != prod_smarts:
-            replace_dict_atoms[atom_cgr.GetAtomMapNum()] = (
-                f"{{{reac_smarts}|{prod_smarts}}}"
-            )
+            replace_dict_atoms[atom_cgr.GetAtomMapNum()] = f"{{{reac_smarts}|{prod_smarts}}}"
         else:
             replace_dict_atoms[atom_cgr.GetAtomMapNum()] = reac_smarts
 
@@ -294,9 +290,7 @@ def rxnsmiles_to_cgrsmiles(
 
     # change atoms
     for k in replace_dict_atoms.keys():
-        smi_cgr = smi_cgr.replace(
-            re.findall(rf"\[[^):]*:{k}\]", smi_cgr)[0], replace_dict_atoms[k]
-        )
+        smi_cgr = smi_cgr.replace(re.findall(rf"\[[^):]*:{k}\]", smi_cgr)[0], replace_dict_atoms[k])
 
     if not keep_atom_mapping:
         smi_cgr = remove_atom_mapping(smi_cgr)

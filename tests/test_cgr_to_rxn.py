@@ -25,30 +25,51 @@ from cgr_smiles.utils import ROOT_DIR, canonicalize
 TEST_DATA_PATH = ROOT_DIR / "tests" / "data" / "cgr_test_cases.csv"
 
 
+@pytest.fixture(scope="session")
 def cgr_test_cases():
     """Loads test cases from a CSV file once per test module."""
     df = pd.read_csv(TEST_DATA_PATH)
     return list(zip(df["rxn"], df["rxn_smiles"], df["cgr_smiles"]))
 
 
-@pytest.mark.parametrize("rxn_id, rxn_smiles, cgr_smiles", cgr_test_cases())
+@pytest.mark.parametrize("rxn_id, rxn_smiles, cgr_smiles", cgr_test_cases)
 def test_cgrsmiles_to_rxnsmiles(rxn_id, rxn_smiles, cgr_smiles):
-    # note; test case 8562 has invalid stereochem. in reac: '[N:1](=[C:2](/[O:3][C:4]([C:5]([C:6]#[N:7])([H:12])[H:13])([H:10])[H:11])[H:9])\\[H:8]'
-    # if rxn_id in [4870]:
-
+    """Check that CGR to RXN conversion reproduces the original reaction SMILES."""
     res1 = cgrsmiles_to_rxnsmiles(cgr_smiles)
     rxn2 = canonicalize(rxn_smiles)
     res2 = canonicalize(res1)
     assert rxn2 == res2, f"Assertion error for reaction with id {rxn_id}"
 
 
+@pytest.fixture(scope="session")
 def e_z_stereo_test_cases():
+    """Provide E/Z stereochemistry test cases."""
     return [
-        # (1, "[F:1][CH:2]=[CH:3][F:4]>>[F:1]/[CH:2]=[CH:3]/[F:4]", "[F:1]{-|/}[CH:2]=[CH:3]{-|/}[F:4]"),  # trans
-        # (2, "[F:1][CH:2]=[CH:3][F:4]>>[CH:2](\\[F:1])=[CH:3]/[F:4]", "[F:1]{-|/}[CH:2]=[CH:3]{-|/}[F:4]"),  # trans
-        # (3, "[F:1][CH:2]=[CH:3][F:4]>>[F:1]\\[CH:2]=[CH:3]/[F:4]", "[F:1]{-|\\}[CH:2]=[CH:3]{-|/}[F:4]"),  # cis
-        # (4, "[F:1][CH:2]=[CH:3][F:4]>>[CH:2](/[F:1])=[CH:3]/[F:4]", "[F:1]{-|\\}[CH:2]=[CH:3]{-|/}[F:4]"),  # cis
-        # (5, "[F:1]/[CH:2]=[CH:3]/[F:4]>>[F:1][CH:2]=[CH:3][F:4]", "[F:1]{/|-}[CH:2]=[CH:3]{/|-}[F:4]"),  # trans
+        (
+            1,
+            "[F:1][CH:2]=[CH:3][F:4]>>[F:1]/[CH:2]=[CH:3]/[F:4]",
+            "[F:1]{-|/}[CH:2]=[CH:3]{-|/}[F:4]",
+        ),  # trans
+        (
+            2,
+            "[F:1][CH:2]=[CH:3][F:4]>>[CH:2](\\[F:1])=[CH:3]/[F:4]",
+            "[F:1]{-|/}[CH:2]=[CH:3]{-|/}[F:4]",
+        ),  # trans
+        (
+            3,
+            "[F:1][CH:2]=[CH:3][F:4]>>[F:1]\\[CH:2]=[CH:3]/[F:4]",
+            "[F:1]{-|\\}[CH:2]=[CH:3]{-|/}[F:4]",
+        ),  # cis
+        (
+            4,
+            "[F:1][CH:2]=[CH:3][F:4]>>[CH:2](/[F:1])=[CH:3]/[F:4]",
+            "[F:1]{-|\\}[CH:2]=[CH:3]{-|/}[F:4]",
+        ),  # cis
+        (
+            5,
+            "[F:1]/[CH:2]=[CH:3]/[F:4]>>[F:1][CH:2]=[CH:3][F:4]",
+            "[F:1]{/|-}[CH:2]=[CH:3]{/|-}[F:4]",
+        ),  # trans
         (
             6,
             "[CH:2](\\[F:1])=[CH:3]/[F:4]>>[F:1][CH:2]=[CH:3][F:4]",
@@ -72,21 +93,17 @@ def e_z_stereo_test_cases():
     ]
 
 
-# def test_rxnsmiles_to_cgrsmiles_e_z_stereo(idx, rxn_smiles, cgr_smiles):
-@pytest.mark.parametrize("idx, rxn_smiles, cgr_smiles", e_z_stereo_test_cases())
+@pytest.mark.parametrize("idx, rxn_smiles, cgr_smiles", e_z_stereo_test_cases)
 def test_rxnsmiles_to_cgrsmiles_e_z_stereo(idx, rxn_smiles, cgr_smiles):
+    """Check that E/Z stereochemistry is correctly preserved in RXN->CGR->RXN conversion."""
     result = cgrsmiles_to_rxnsmiles(cgr_smiles)
     can_res = canonicalize(result)
     can_rxn = canonicalize(rxn_smiles)
     assert can_res == can_rxn, f"Assertion error for reaction with id {idx}"
 
 
-# cases = e_z_stereo_test_cases()
-# for i, r, c in cases:
-#     test_rxnsmiles_to_cgrsmiles_e_z_stereo(i, r, c)
-
-
 def test_parse_bonds_from_smiles():
+    """Verify correct parsing of bonds and stereochemistry from a SMILES string."""
     smiles = "[c:1]1([n:2][n:3][c:4]([H:8])[n:5][n:6]1)[CH3:9]/[N:10]=[N:11]\\[CH3:12]"
     expected_output = {
         (1, 2): "-",
@@ -106,9 +123,7 @@ def test_parse_bonds_from_smiles():
 
 
 def test_remove_bonds_by_atom_map_nums():
-    """
-    Tests successful removal of specified bonds using atom map numbers.
-    """
+    """Tests successful removal of specified bonds using atom map numbers."""
     mol = Chem.MolFromSmiles("[C:1][C:2]=[C:3][C:4]")
     bonds_to_remove = [(2, 3)]
     modified_mol = remove_bonds_by_atom_map_nums(mol, bonds_to_remove)
@@ -118,10 +133,7 @@ def test_remove_bonds_by_atom_map_nums():
 
 
 def test_remove_bonds_by_atom_map_nums_invalid_key():
-    """
-    Test that remove_bonds_by_atom_map_nums raises a KeyError when
-    atom map numbers are not found in the molecule.
-    """
+    """Test that remove_bonds_by_atom_map_nums raises a KeyError when atom map numberis invalid."""
     mol = Chem.MolFromSmiles("[C:1][C:2]=[C:3][C:4]")
     bonds_to_remove = [(99, 100)]
 
@@ -130,8 +142,7 @@ def test_remove_bonds_by_atom_map_nums_invalid_key():
 
 
 def test_update_chirality_tags_without_flip():
-    """
-    Test that chirality is preserved when the neighbor order implies no flip.
+    """Test that chirality is preserved when the neighbor order implies no flip.
 
     The chirality in the SMILES and CGR scaffold differs in tag (@ vs @@),
     but the neighbor order leads to an even permutation, so no flip is needed.
@@ -146,8 +157,7 @@ def test_update_chirality_tags_without_flip():
 
 
 def test_update_chirality_tags_with_flip():
-    """
-    Test that chirality tag is flipped when the neighbor order implies inversion.
+    """Test that chirality tag is flipped when the neighbor order implies inversion.
 
     The input SMILES has a '@' tag, and the CGR scaffold has '@',
     but the neighbor order is an odd permutation, so chirality must be flipped.
@@ -164,6 +174,7 @@ def test_update_chirality_tags_with_flip():
 
 
 def test_find_cis_trans_stereo_bonds():
+    """Verify detection of cis/trans stereochemistry bonds in a bond dictionary."""
     bonds = {
         (1, 2): "-",
         (2, 3): "-",
@@ -183,9 +194,7 @@ def test_find_cis_trans_stereo_bonds():
 
 
 def test_update_cis_trans_stereo_chem_cis_update():
-    """
-    Tests that a double bond's stereochemistry is correctly updated to cis.
-    """
+    """Tests that a double bond's stereochemistry is correctly updated to cis."""
     smiles = "[c:1]1([CH2:9]/[N:10]=[N:11]/[CH3:12])[n:2][n:3][cH:4][n:5][n:6]1"
     mol = Chem.MolFromSmiles(smiles)
 
@@ -205,16 +214,11 @@ def test_update_cis_trans_stereo_chem_cis_update():
 
     modified_mol = update_cis_trans_stereo_chem(mol, parsed_bonds_data)
     modified_smiles = Chem.MolToSmiles(modified_mol, canonical=False)
-    assert (
-        modified_smiles
-        == "[c:1]1([CH2:9]/[N:10]=[N:11]\\[CH3:12])[n:2][n:3][cH:4][n:5][n:6]1"
-    )
+    assert modified_smiles == "[c:1]1([CH2:9]/[N:10]=[N:11]\\[CH3:12])[n:2][n:3][cH:4][n:5][n:6]1"
 
 
 def test_update_cis_trans_stereo_chem_trans_update():
-    """
-    Tests that a double bond's stereochemistry is correctly updated to trans.
-    """
+    """Tests that a double bond's stereochemistry is correctly updated to trans."""
     smiles = "[c:1]1([CH2:9][N:10]=[N:11][CH3:12])[n:2][n:3][cH:4][n:5][n:6]1"
     mol = Chem.MolFromSmiles(smiles)
 
@@ -234,16 +238,11 @@ def test_update_cis_trans_stereo_chem_trans_update():
 
     modified_mol = update_cis_trans_stereo_chem(mol, parsed_bonds_data)
     modified_smiles = Chem.MolToSmiles(modified_mol, canonical=False)
-    assert (
-        modified_smiles
-        == "[c:1]1([CH2:9]/[N:10]=[N:11]/[CH3:12])[n:2][n:3][cH:4][n:5][n:6]1"
-    )
+    assert modified_smiles == "[c:1]1([CH2:9]/[N:10]=[N:11]/[CH3:12])[n:2][n:3][cH:4][n:5][n:6]1"
 
 
 def test_update_cis_trans_stereo_chem_with_disconnected_molecule():
-    """
-    Tests that a double bond's stereochemistry is correctly updated to trans.
-    """
+    """Tests that a double bond's stereochemistry is correctly updated to trans."""
     smiles = "[c:1]1([CH2:9][N:10]=[N:11][CH3:12])[n:2][n:3][cH:4][n:5][n:6]1.[CH4:13]"
     mol = Chem.MolFromSmiles(smiles)
 
@@ -263,16 +262,11 @@ def test_update_cis_trans_stereo_chem_with_disconnected_molecule():
 
     modified_mol = update_cis_trans_stereo_chem(mol, parsed_bonds_data)
     modified_smiles = Chem.MolToSmiles(modified_mol, canonical=False)
-    assert (
-        modified_smiles
-        == "[c:1]1([CH2:9]/[N:10]=[N:11]/[CH3:12])[n:2][n:3][cH:4][n:5][n:6]1.[CH4:13]"
-    )
+    assert modified_smiles == "[c:1]1([CH2:9]/[N:10]=[N:11]/[CH3:12])[n:2][n:3][cH:4][n:5][n:6]1.[CH4:13]"
 
 
 def test_get_reac_prod_scaffold_smiles_from_cgr():
-    """
-    Tests parsing of a CGR string into reactant and product scaffold SMILES.
-    """
+    """Tests parsing of a CGR string into reactant and product scaffold SMILES."""
     cgr = "{[O:1]|[O+:1]}{=|#}{[C:2]|[C-:2]}1{-|~}[C:3](#[C:4][H:6]){~|-}[H:5]{-|~}1"
 
     expected_reac = "[O:1]=[C:2]1-[C:3](#[C:4][H:6])~[H:5]-1"
@@ -285,10 +279,8 @@ def test_get_reac_prod_scaffold_smiles_from_cgr():
 
 
 def test_get_chiral_center_map_nums():
-    """
-    Tests identification of chiral centers in a complex molecule.
-    """
-    smiles = "[O:1]([C@@:2]1([H:9])[C@@:3]2([H:10])[C@@:4]3([H:11])[C:5]([H:12])([H:13])[C@:6]1([H:14])[N:7]23)[H:8]"
+    """Tests identification of chiral centers in a complex molecule."""
+    smiles = "[O:1]([C@@:2]1([H:9])[C@@:3]2([H:10])[C@@:4]3([H:11])[C:5]([H:12])([H:13])[C@:6]1([H:14])[N:7]23)[H:8]"  # noqa: E501
     mol = Chem.MolFromSmiles(smiles)
     chiral_centers = get_chiral_center_map_nums(mol)
 
@@ -297,10 +289,7 @@ def test_get_chiral_center_map_nums():
 
 
 def test_get_chiral_center_map_nums_no_chirality():
-    """
-    Test that get_chiral_center_map_nums returns an empty list when
-    the molecule has no chiral centers.
-    """
+    """Test that get_chiral_center_map_nums returns an empty list when mol has no chiral centers."""
     smiles = "[C:1]([H:2])([H:3])[C:4]([H:5])([H:6])[H:7]"
     mol = Chem.MolFromSmiles(smiles)
     chiral_centers = get_chiral_center_map_nums(mol)

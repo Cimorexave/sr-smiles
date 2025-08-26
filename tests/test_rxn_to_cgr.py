@@ -17,11 +17,13 @@ def cgr_test_cases():
 
 @pytest.mark.parametrize("rxn_id, rxn_smiles, cgr_smiles", cgr_test_cases())
 def test_rxnsmiles_to_cgrsmiles(rxn_id, rxn_smiles, cgr_smiles):
+    """Test the RXN to CGR (forward) transformation."""
     result = rxnsmiles_to_cgrsmiles(rxn_smiles, keep_atom_mapping=True)
     assert result == cgr_smiles, f"Assertion error for reaction with id {rxn_id}"
 
 
 def e_z_stereo_test_cases():
+    """Return test cases for E/Z stereochemistry transformations."""
     return [
         (
             1,
@@ -73,5 +75,6 @@ def e_z_stereo_test_cases():
 
 @pytest.mark.parametrize("idx, rxn_smiles, cgr_smiles", e_z_stereo_test_cases())
 def test_rxnsmiles_to_cgrsmiles_e_z_stereo(idx, rxn_smiles, cgr_smiles):
+    """Test E/Z stereo changes in RXN to CGR transformation."""
     result = rxnsmiles_to_cgrsmiles(rxn_smiles, keep_atom_mapping=True)
     assert result == cgr_smiles, f"Assertion error for reaction with id {idx}"

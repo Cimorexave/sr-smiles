@@ -1,15 +1,25 @@
+from collections import Counter
+
 from rdkit import Chem
 from rdkit.Chem import rdchem
-from cgr_smiles.atom_mapping import add_atom_mapping
-from cgr_smiles.utils import get_list_of_atom_map_numbers, make_mol
 
-from collections import Counter
+from cgr_smiles.utils import get_list_of_atom_map_numbers, make_mol
 
 
 def get_element_counts(smiles: str) -> Counter:
-    """
-    Given a dot-separated SMILES string, return a Counter of element counts.
-    Implicit hydrogens are included.
+    """Count elements in a SMILES string, including implicit hydrogens.
+
+    Given a SMILES string, this function returns a Counter of element occurrences.
+    Implicit hydrogens are explicitly added before counting.
+
+    Args:
+        smiles (str): A SMILES string representing a molecule.
+
+    Returns:
+        Counter: A mapping of element symbols to their counts in the molecule.
+
+    Raises:
+        ValueError: If the SMILES string is invalid.
     """
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
@@ -22,8 +32,20 @@ def get_element_counts(smiles: str) -> Counter:
 
 
 def is_rxn_balanced(rxn_smi: str) -> str:
-    """
-    Check if a reaction SMILES is atom-balanced.
+    """Check whether a reaction SMILES string is atom-balanced.
+
+    This function compares the total count of each element in the reactants and products
+    to determine if the reaction is balanced.
+
+    Args:
+        rxn_smi (str): A reaction SMILES string in the format "reactants>>products".
+
+    Returns:
+        bool: True if the reaction is balanced (reactants and products have the same element counts),
+            False otherwise.
+
+    Raises:
+        ValueError: If the input is not a valid reaction SMILES (missing '>>').
     """
     if ">>" not in rxn_smi:
         raise ValueError("Not a valid reaction SMILES (missing '>>').")
@@ -35,7 +57,18 @@ def is_rxn_balanced(rxn_smi: str) -> str:
     return reac_counts == prod_counts
 
 
-def is_rxn_mapped(rxn_smi: str) -> str:
+def is_rxn_mapped(rxn_smi: str) -> bool:
+    """Check if a reaction SMILES has atom mapping on both reactants and products.
+
+    This function examines a reaction SMILES string and returns True if all reactants
+    and products contain atom map numbers; otherwise, it returns False.
+
+    Args:
+        rxn_smi (str): A reaction SMILES string in the format "reactants>>products".
+
+    Returns:
+        bool: True if both reactants and products contain atom mapping, False otherwise.
+    """
     reac_smi, prod_smi = rxn_smi.split(">>")
     map_nums_reac = get_list_of_atom_map_numbers(reac_smi)
     map_nums_prod = get_list_of_atom_map_numbers(prod_smi)
@@ -45,27 +78,40 @@ def is_rxn_mapped(rxn_smi: str) -> str:
     return True
 
 
-def make_balanced_and_fully_mapped(rxn_smi: str) -> str:
-    is_mapped = is_rxn_mapped(rxn_smi)
-    is_balanced = is_rxn_balanced(rxn_smi)
-    if is_balanced and is_mapped:
-        return rxn_smi
-    elif is_balanced and not is_mapped:
-        # add atom mapping
-        rxn_smi = add_atom_mapping(rxn_smi, method="graph_overlay")  # or rxn_mapper
-        return rxn_smi
-    elif not is_balanced:
-        # check if their is a partial mapping:
-        # add a partial mapping
-        rxn_smi = add_atom_mapping(rxn_smi, method="graph_overlay")  # or rxn_mapper
-        rxn_smi = balance_reaction(rxn_smi)
-        return rxn_smi
+# def make_balanced_and_fully_mapped(rxn_smi: str) -> str:
+#     is_mapped = is_rxn_mapped(rxn_smi)
+#     is_balanced = is_rxn_balanced(rxn_smi)
+#     if is_balanced and is_mapped:
+#         return rxn_smi
+#     elif is_balanced and not is_mapped:
+#         # add atom mapping
+#         rxn_smi = add_atom_mapping(rxn_smi, method="graph_overlay")  # or rxn_mapper
+#         return rxn_smi
+#     elif not is_balanced:
+#         # check if their is a partial mapping:
+#         # add a partial mapping
+#         rxn_smi = add_atom_mapping(rxn_smi, method="graph_overlay")  # or rxn_mapper
+#         rxn_smi = balance_reaction(rxn_smi)
+#         return rxn_smi
 
 
 # our assumption: if we receive an unbalanced, partially mapped reaction,
 # we assume the mapping is present for the intersection of atoms that occour
 # in both reac and prod. Otherwise, we delete the mapping, and create a new one.
 def balance_reaction(rxn_smiles: str) -> str:
+    """Balance a reaction by ensuring all atom map numbers are consistent between reactants and products.
+
+    This function takes a reaction SMILES string and adds any missing atoms or bonds
+    to ensure that each atom map number present in the products is also present in the reactants,
+    and vice versa. Explicit hydrogens, charges, isotopes, and bond types are preserved.
+
+    Args:
+        rxn_smiles (str): A reaction SMILES string in the format "reactants>>products",
+            where each side may contain atoms with mapping numbers.
+
+    Returns:
+        str: A balanced reaction SMILES string with consistent atom mapping between reactants and products.
+    """
     smi_reac, smi_prod = rxn_smiles.split(">>")
     mol_reac, mol_prod = make_mol(smi_reac), make_mol(smi_prod)
 
@@ -84,20 +130,13 @@ def balance_reaction(rxn_smiles: str) -> str:
         map_num = atom.GetAtomMapNum()
         if map_num == 0:
             atom.SetAtomMapNum(max_map_num + 1)
-            # new_num = atom.GetAtomMapNum()
             max_map_num += 1
 
     for atom in rw_prod.GetAtoms():
         map_num = atom.GetAtomMapNum()
         if map_num == 0:
             atom.SetAtomMapNum(max_map_num + 1)
-            # new_num = atom.GetAtomMapNum()
             max_map_num += 1
-
-    # smi_reac2, smi_prod2 = (
-    #     Chem.MolToSmiles(rw_reac, canonical=False),
-    #     Chem.MolToSmiles(rw_prod, canonical=False),
-    # )
 
     # Find atoms missing from reactants
     map_nums_reac = {a.GetAtomMapNum() for a in rw_reac.GetAtoms()}
@@ -129,9 +168,7 @@ def balance_reaction(rxn_smiles: str) -> str:
                 other_atom = bond.GetOtherAtom(atom)
                 other_map_num = other_atom.GetAtomMapNum()
                 if other_map_num in missing_map_nums_reac:
-                    bonds_to_add_reac.append(
-                        (atom_map_num, other_map_num, bond.GetBondType())
-                    )
+                    bonds_to_add_reac.append((atom_map_num, other_map_num, bond.GetBondType()))
 
     # add missing atoms to reac and prod
     for atom in rw_reac.GetAtoms():
@@ -145,25 +182,19 @@ def balance_reaction(rxn_smiles: str) -> str:
                 other_atom = bond.GetOtherAtom(atom)
                 other_map_num = other_atom.GetAtomMapNum()
                 if other_map_num in missing_map_nums_prod:
-                    bonds_to_add_prod.append(
-                        (atom_map_num, other_map_num, bond.GetBondType())
-                    )
+                    bonds_to_add_prod.append((atom_map_num, other_map_num, bond.GetBondType()))
 
     # add bonds to reac mol
     for m1, m2, b_type in bonds_to_add_reac:
         if m1 in new_atom_indices_reac:
             idx1 = new_atom_indices_reac[m1]
         else:
-            idx1 = next(
-                a.GetIdx() for a in frag_reac.GetAtoms() if a.GetAtomMapNum() == m1
-            )
+            idx1 = next(a.GetIdx() for a in frag_reac.GetAtoms() if a.GetAtomMapNum() == m1)
 
         if m2 in new_atom_indices_reac:
             idx2 = new_atom_indices_reac[m2]
         else:
-            idx2 = next(
-                a.GetIdx() for a in frag_reac.GetAtoms() if a.GetAtomMapNum() == m2
-            )
+            idx2 = next(a.GetIdx() for a in frag_reac.GetAtoms() if a.GetAtomMapNum() == m2)
 
         if frag_reac.GetBondBetweenAtoms(idx1, idx2) is None:
             frag_reac.AddBond(idx1, idx2, b_type)
@@ -173,39 +204,15 @@ def balance_reaction(rxn_smiles: str) -> str:
         if m1 in new_atom_indices_prod:
             idx1 = new_atom_indices_prod[m1]
         else:
-            idx1 = next(
-                a.GetIdx() for a in frag_prod.GetAtoms() if a.GetAtomMapNum() == m1
-            )
+            idx1 = next(a.GetIdx() for a in frag_prod.GetAtoms() if a.GetAtomMapNum() == m1)
 
         if m2 in new_atom_indices_prod:
             idx2 = new_atom_indices_prod[m2]
         else:
-            idx2 = next(
-                a.GetIdx() for a in frag_prod.GetAtoms() if a.GetAtomMapNum() == m2
-            )
+            idx2 = next(a.GetIdx() for a in frag_prod.GetAtoms() if a.GetAtomMapNum() == m2)
 
         if frag_prod.GetBondBetweenAtoms(idx1, idx2) is None:
             frag_prod.AddBond(idx1, idx2, b_type)
-
-    # for atom in frag_reac.GetAtoms():
-    #     if atom.GetSymbol() == "N" and atom.GetTotalValence() < atom.GetValence(which=ValenceType.EXPLICIT):
-    #         atom.SetNumExplicitHs(1)
-    #         atom.UpdatePropertyCache()
-
-    # for atom in frag_prod.GetAtoms():
-    #     if atom.GetSymbol() == "N" and atom.GetTotalValence() < atom.GetValence(which=ValenceType.EXPLICIT):
-    #         atom.SetNumExplicitHs(1)
-    #         atom.UpdatePropertyCache()
-
-    # hs_reac_mol = count_total_hydrogens(rw_reac)
-    # hs_prod_mol = count_total_hydrogens(rw_prod)
-
-    # hs_reac_frg = count_total_hydrogens(frag_reac)
-    # hs_prod_frg = count_total_hydrogens(frag_prod)
-    # print(f"hs_reac_mol = {hs_reac_mol}")
-    # print(f"hs_reac_frg = {hs_reac_frg}")
-    # print(f"hs_prod_mol = {hs_prod_mol}")
-    # print(f"hs_prod_frg = {hs_prod_frg}")
 
     rw_reac = Chem.RWMol(Chem.CombineMols(rw_reac, frag_reac))
     rw_prod = Chem.RWMol(Chem.CombineMols(rw_prod, frag_prod))
@@ -214,7 +221,3 @@ def balance_reaction(rxn_smiles: str) -> str:
     balanced_reac_smi = Chem.MolToSmiles(rw_reac, canonical=False)
     balanced_prod_smi = Chem.MolToSmiles(rw_prod, canonical=False)
     return balanced_reac_smi + ">>" + balanced_prod_smi
-
-
-def count_total_hydrogens(mol):
-    return sum(atom.GetTotalNumHs() for atom in mol.GetAtoms())

@@ -22,6 +22,7 @@ from cgr_smiles.atom_mapping import add_atom_mapping, is_fully_atom_mapped
     ],
 )
 def test_is_fully_mapped_rxn(rxn_smiles, expected):
+    """Test that `is_fully_atom_mapped` correctly identifies fully mapped reactions."""
     assert is_fully_atom_mapped(rxn_smiles) == expected
 
 
@@ -47,27 +48,16 @@ REACTION_CASES = [
 
 @pytest.mark.parametrize("rxn,expected", REACTION_CASES)
 def test_add_atom_mapping(rxn, expected):
-    """
-    Test that add_atom_mapping returns a mapped reaction SMILES
-    for both rxnmapper and graph_overlay methods.
-    """
+    """Test that add_atom_mapping returns a mapped reaction SMILES for `graph_overlay` method."""
     mapped_smi = add_atom_mapping(rxn, method="graph_overlay")
 
     assert isinstance(mapped_smi, str)
     assert mapped_smi == expected
 
 
-# for a, b in REACTION_CASES:
-#     test_add_atom_mapping(a, b)
-
-# mapped_smi = add_atom_mapping(rxn, method="graph_overlay")
-
-
 @pytest.mark.parametrize("rxn,expected", REACTION_CASES)
 def test_add_atom_mapping_with_rxn_mapper(rxn, expected):
-    """
-    Test that add_atom_mapping returns a mapped reaction SMILES for rxnmapper.
-    """
+    """Test that add_atom_mapping returns a mapped reaction SMILES for `rxnmapper` method."""
     mapped_smi = add_atom_mapping(rxn, method="rxnmapper")
 
     assert isinstance(mapped_smi, str)
@@ -106,8 +96,5 @@ def mapping_pattern(smi: str):
 
 
 def mapping_matches(smi: str, ref_smi: str) -> bool:
-    """
-    Checks if the mapping pattern in smi matches that in ref_smi,
-    ignoring actual atom map numbers but preserving mapping relationships.
-    """
+    """Check if the mapping pattern matches ref_smi, ignoring map numbers."""
     return mapping_pattern(smi) == mapping_pattern(ref_smi)
