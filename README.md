@@ -38,28 +38,38 @@ pip install cgr-smiles
 You can use the library in three different ways:
 
 ### 1. Import functions directly
-```python
-from cgr_smiles import to_cgr
+This is suitable to get started, and especially if you wanna use it for single reaction smiles
 
-rxn = "CCO>>CC=O"
-cgr = to_cgr(rxn)
-print(cgr)  # Example output: C[C;:0][O>>=O]
+```python
+from cgr_smiles import cgrsmile_to_rxn_smiles
+
+rxn = "[C:1].[O:2]=[O:3]>>[O:2]=[C:1]=[O:3]"
+cgr = cgrsmile_to_rxn_smiles(rxn)
+print(cgr)
+```
+```python
+"C1{~|=}O{=|~}O{~|=}1"
+```
+
+
+### 3. Use the class interface
+If you wanna apply the CGR-SMILES transformation to a bigger batch of data, you can use this class `RxnToCgrTransform`. Especially if your reaction smiles are stored in a pd dataframe, then give, the df, the col name, and the
+
+```python
+from cgr_smiles import RxnToCgrTransform
+
+df = pd.read_csv("some/file.csv")
+col_name = "rxn_smiles"
+
+transform = RxnToCgrTransform()
+df = converter.transform(df)
+print(cgr)
 ```
 
 ### 2. Use the CLI
 ```bash
 cgr-smiles "CCO>>CC=O"
 # Output: C[C;:0][O>>=O]
-```
-
-### 3. Use the class interface
-```python
-from cgr_smiles import CGRConverter
-
-converter = CGRConverter()
-rxn = "CCO>>CC=O"
-cgr = converter.transform(rxn)
-print(cgr)
 ```
 
 ---
