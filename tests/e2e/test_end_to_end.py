@@ -1,15 +1,16 @@
+import csv
+
 import pandas as pd
 import pytest
 
-from cgr_smiles.cgr_to_rxn import cgrsmiles_to_rxnsmiles
-from cgr_smiles.rxn_to_cgr import rxnsmiles_to_cgrsmiles
+from cgr_smiles.transforms.cgr_to_rxn import cgrsmiles_to_rxnsmiles
+from cgr_smiles.transforms.rxn_to_cgr import rxnsmiles_to_cgrsmiles
 from cgr_smiles.utils import ROOT_DIR, canonicalize
 
-TEST_DATA_PATH = ROOT_DIR / "data" / "cgr"
+TEST_DATA_PATH = ROOT_DIR / "tests" / "data"
 
 
-@pytest.fixture(scope="session")
-def individual_test_cases():
+def generate_individual_tests():
     """Load and prepare individual reaction test cases for the entire test session.
 
     Reads multiple CSV datasets and returns a list of test cases and corresponding IDs.
@@ -48,16 +49,44 @@ def individual_test_cases():
     return test_cases, ids
 
 
-@pytest.mark.parametrize(
-    "file_path, idx, rxn_smiles, rxn_col",
-    *individual_test_cases(),  # unpack fixture return value
-)
+E2E_FAILURES_CSV = ROOT_DIR / "tests" / "e2e" / "roundtrip_failures.csv"
+
+
+# Ensure the CSV file is initialized with headers (optional, but useful)
+def initialize_failures_csv_file():
+    """Create file to store failed e2e test cases to."""
+    with open(E2E_FAILURES_CSV, mode="w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(
+            [
+                "file_path",
+                "rxn_smiles",
+                "e2e_rxn_smiles",
+                "can_rxn_smiles",
+                "can_e2e_rxn_smiles",
+                "cgr_smiles",
+            ]
+        )  # Column headers
+
+
+# Call this function once before running the tests
+initialize_failures_csv_file()
+test_cases, ids = generate_individual_tests()
+
+
+@pytest.mark.parametrize("file_path, idx, rxn_smiles, rxn_col", test_cases, ids=ids)
 def test_roundtrip_per_sample(file_path, idx, rxn_smiles, rxn_col):
     """Test single sample roundtrip (RXN -> CGR -> RXN)."""
     rxn_can = canonicalize(rxn_smiles)
     cgr = rxnsmiles_to_cgrsmiles(rxn_smiles, keep_atom_mapping=True)
     res = cgrsmiles_to_rxnsmiles(cgr)
     res_can = canonicalize(res)
+
+    if res_can != rxn_can:
+        # Log the failing case to the CSV file
+        with open(E2E_FAILURES_CSV, mode="a", newline="") as file:
+            writer = csv.writer(file)
+            writer.writerow([file_path, rxn_smiles, res, rxn_can, res_can, cgr])  # Write the failing case
 
     assert (
         res_can == rxn_can

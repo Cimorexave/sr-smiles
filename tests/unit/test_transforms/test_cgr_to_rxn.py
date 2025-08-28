@@ -2,7 +2,7 @@ import pandas as pd
 import pytest
 from rdkit import Chem
 
-from cgr_smiles.cgr_to_rxn import (
+from cgr_smiles.transforms.cgr_to_rxn import (
     cgrsmiles_to_rxnsmiles,
     find_cis_trans_stereo_bonds,
     get_chiral_center_map_nums,
@@ -25,14 +25,16 @@ from cgr_smiles.utils import ROOT_DIR, canonicalize
 TEST_DATA_PATH = ROOT_DIR / "tests" / "data" / "cgr_test_cases.csv"
 
 
-@pytest.fixture(scope="session")
 def cgr_test_cases():
     """Loads test cases from a CSV file once per test module."""
     df = pd.read_csv(TEST_DATA_PATH)
     return list(zip(df["rxn"], df["rxn_smiles"], df["cgr_smiles"]))
 
 
-@pytest.mark.parametrize("rxn_id, rxn_smiles, cgr_smiles", cgr_test_cases)
+CGR_CASES = cgr_test_cases()
+
+
+@pytest.mark.parametrize("rxn_id, rxn_smiles, cgr_smiles", CGR_CASES)
 def test_cgrsmiles_to_rxnsmiles(rxn_id, rxn_smiles, cgr_smiles):
     """Check that CGR to RXN conversion reproduces the original reaction SMILES."""
     res1 = cgrsmiles_to_rxnsmiles(cgr_smiles)
@@ -41,7 +43,6 @@ def test_cgrsmiles_to_rxnsmiles(rxn_id, rxn_smiles, cgr_smiles):
     assert rxn2 == res2, f"Assertion error for reaction with id {rxn_id}"
 
 
-@pytest.fixture(scope="session")
 def e_z_stereo_test_cases():
     """Provide E/Z stereochemistry test cases."""
     return [
@@ -93,7 +94,10 @@ def e_z_stereo_test_cases():
     ]
 
 
-@pytest.mark.parametrize("idx, rxn_smiles, cgr_smiles", e_z_stereo_test_cases)
+E_Z_STEREO_CASES = e_z_stereo_test_cases()
+
+
+@pytest.mark.parametrize("idx, rxn_smiles, cgr_smiles", E_Z_STEREO_CASES)
 def test_rxnsmiles_to_cgrsmiles_e_z_stereo(idx, rxn_smiles, cgr_smiles):
     """Check that E/Z stereochemistry is correctly preserved in RXN->CGR->RXN conversion."""
     result = cgrsmiles_to_rxnsmiles(cgr_smiles)
