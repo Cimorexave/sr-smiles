@@ -1,5 +1,7 @@
 import re
+from typing import List, Optional, Union
 
+import pandas as pd
 from rdkit import Chem
 
 from cgr_smiles.logger import logger
@@ -89,6 +91,100 @@ def remove_redundant_brackets(cgr: str) -> str:
     cgr = re.sub(r"\[([^\]]+)\]", replace_bracketed, cgr)
 
     return cgr
+
+
+class RxnToCgrTransform:
+    """Transform reaction SMILES into CGR SMILES.
+
+    This class provides a callable interface to convert reaction SMILES into
+    CGR SMILES. It supports single strings, lists of strings, pandas Series,
+    and pandas DataFrames.
+
+    Attributes:
+        keep_atom_mapping (bool): Whether to preserve atom mapping in the output.
+        remove_brackets (bool): Whether to remove brackets from the SMILES.
+        remove_hydrogens (bool): Whether to remove explicit hydrogens.
+        rxn_col (Optional[str]): Column name in a DataFrame containing reaction SMILES.
+
+    Examples:
+        Transform a pandas DataFrame of reactions into CGR SMILES:
+
+        >>> import pandas as pd
+        >>> df = pd.read_csv("path/to/file.csv")
+        >>> transform = RxnToCgrTransform(rxn_col="rxn_smiles")
+        >>> df["cgr_smiles"] = transform(df)
+    """
+
+    def __init__(
+        self,
+        keep_atom_mapping: bool = False,
+        remove_brackets: bool = False,
+        remove_hydrogens: bool = False,
+        rxn_col: Optional[str] = None,
+    ) -> None:
+        """Initialize the transformation object.
+
+        Args:
+            keep_atom_mapping (bool, optional): If True, preserve atom mapping
+                in the output. Defaults to False.
+            remove_brackets (bool, optional): If True, remove brackets from
+                the SMILES. Defaults to False.
+            remove_hydrogens (bool, optional): If True, remove explicit
+                hydrogens. Defaults to False.
+            rxn_col (str, optional): Column name in a DataFrame containing
+                reaction SMILES. Required if passing a DataFrame. Defaults to None.
+        """
+        self.keep_atom_mapping = keep_atom_mapping
+        self.remove_brackets = remove_brackets
+        self.remove_hydrogens = remove_hydrogens
+        self.rxn_col = rxn_col
+
+    def __call__(
+        self, data: Union[str, List[str], pd.Series, pd.DataFrame]
+    ) -> Union[str, List[str], pd.Series, pd.DataFrame]:
+        """Apply the transformation to reaction SMILES.
+
+        Args:
+            data (Union[str, List[str], pd.Series, pd.DataFrame]): Input data
+                containing reaction SMILES. Can be a single string, a list of
+                strings, a pandas Series, or a pandas DataFrame.
+            rxn_col (str, optional): Column name to use if `data` is a DataFrame.
+                Overrides the instance attribute `self.rxn_col` if provided.
+
+        Returns:
+            Union[str, List[str], pd.Series, pd.DataFrame]: Transformed CGR SMILES
+            in the same structure as the input.
+
+        Raises:
+            ValueError: If a DataFrame is provided but `self.rxn_col` is not set.
+            TypeError: If the input type is not supported.
+        """
+        if isinstance(data, str):
+            return rxnsmiles_to_cgrsmiles(
+                data,
+                keep_atom_mapping=self.keep_atom_mapping,
+                remove_brackets=self.remove_brackets,
+                remove_hydrogens=self.remove_hydrogens,
+            )
+
+        elif isinstance(data, list):
+            return [self(d) for d in data]
+
+        elif isinstance(data, pd.Series):
+            return data.apply(self)
+
+        elif isinstance(data, pd.DataFrame):
+            if self.rxn_col is None:
+                raise ValueError(
+                    f"A pandas DataFrame was provided, but `self.rxn_col` is not set.\n"
+                    f"Available columns are: {list(data.columns)}\n"
+                    "Please specify the column name containing the reactions by setting "
+                    "`self.rxn_col` at time of initialization."
+                )
+            return data[self.rxn_col].apply(self)
+
+        else:
+            raise TypeError("Input must be str, list, pandas Series, or DataFrame.")
 
 
 # TODO: do some checks according to our assumptions (atom mapping, balanced etc)

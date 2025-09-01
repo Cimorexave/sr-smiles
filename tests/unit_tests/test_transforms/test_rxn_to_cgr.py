@@ -2,6 +2,7 @@ import pandas as pd
 import pytest
 
 from cgr_smiles.transforms.rxn_to_cgr import (
+    RxnToCgrTransform,
     remove_redundant_brackets,
     remove_redundant_brackets_and_hydrogens,
     rxnsmiles_to_cgrsmiles,
@@ -11,14 +12,17 @@ from cgr_smiles.utils import ROOT_DIR
 TEST_DATA_PATH = ROOT_DIR / "tests" / "data" / "cgr_test_cases.csv"
 
 
-def cgr_test_cases():
+def load_cgr_test_cases():
     """Loads test cases from a CSV file once per test module."""
     df = pd.read_csv(TEST_DATA_PATH)
-    test_cases = list(zip(df["rxn"], df["rxn_smiles"], df["cgr_smiles"]))
-    return test_cases
+    return df
 
 
-@pytest.mark.parametrize("rxn_id, rxn_smiles, cgr_smiles", cgr_test_cases())
+DF = load_cgr_test_cases()
+CGR_TEST_CASES = list(zip(DF["rxn"], DF["rxn_smiles"], DF["cgr_smiles"]))
+
+
+@pytest.mark.parametrize("rxn_id, rxn_smiles, cgr_smiles", CGR_TEST_CASES)
 def test_rxnsmiles_to_cgrsmiles(rxn_id, rxn_smiles, cgr_smiles):
     """Test the RXN to CGR (forward) transformation."""
     result = rxnsmiles_to_cgrsmiles(rxn_smiles, keep_atom_mapping=True)
@@ -130,3 +134,90 @@ def test_remove_redundant_brackets_and_hydrogens(cgr, expected):
 def test_remove_redundant_brackets(cgr, expected):
     """Test removal of redundant brackets."""
     assert remove_redundant_brackets(cgr) == expected
+
+
+def test_RxnToCgrTransform_single_string():
+    """Test RxnToCgrTransform class for single reaction."""
+    transform = RxnToCgrTransform(keep_atom_mapping=True)
+    rxn_smiles = DF.iloc[0]["rxn_smiles"]
+    exp_output = DF.iloc[0]["cgr_smiles"]
+    result = transform(rxn_smiles)
+
+    assert isinstance(result, str)
+    assert result == exp_output
+
+
+def test_RxnToCgrTransform_list_of_strings():
+    """Test RxnToCgrTransform class for a list of reactions."""
+    transform = RxnToCgrTransform(keep_atom_mapping=True)
+    rxn_smiles = DF["rxn_smiles"].tolist()
+    exp_output = DF["cgr_smiles"].tolist()
+
+    results = transform(rxn_smiles)
+
+    assert isinstance(results, list)
+    assert all(isinstance(r, str) for r in results)
+    assert results == exp_output
+
+
+def test_RxnToCgrTransform_pd_series():
+    """Test RxnToCgrTransform class for a pd.Series input."""
+    transform = RxnToCgrTransform(keep_atom_mapping=True)
+    rxn_smiles = DF["rxn_smiles"]
+    exp_output = DF["cgr_smiles"]
+
+    results = transform(rxn_smiles)
+
+    assert isinstance(results, pd.Series)
+    assert all(isinstance(r, str) for r in results)
+    assert results.equals(exp_output)
+
+
+def test_RxnToCgrTransform_pd_df():
+    """Test RxnToCgrTransform class for a pd.Series object."""
+    transform = RxnToCgrTransform(keep_atom_mapping=True, rxn_col="rxn_smiles")
+    df_rxn_smiles = DF
+    exp_output = DF["cgr_smiles"]
+    results = transform(df_rxn_smiles)
+
+    assert isinstance(results, pd.Series)
+    assert all(isinstance(r, str) for r in results)
+    assert results.equals(exp_output)
+
+
+def test_dataframe_without_rxn_col_raises():
+    """Test that RxnToCgrTransform call raises a ValueError isf `self.rxn_col` not set."""
+    transform = RxnToCgrTransform(keep_atom_mapping=True)
+    df = pd.DataFrame({"rxn": ["A>>B"]})
+    with pytest.raises(ValueError, match="`self.rxn_col` is not set"):
+        transform(df)
+
+
+def test_invalid_input_type():
+    """Test that RxnToCgrTransform call raises a TypeError if input type is not valid."""
+    transform = RxnToCgrTransform(keep_atom_mapping=True)
+    with pytest.raises(TypeError):
+        transform(12345)
+
+
+@pytest.mark.parametrize(
+    "empty_input,expected_type",
+    [
+        ("", str),
+        ([], list),
+        (pd.Series([], dtype=object), pd.Series),
+        (pd.DataFrame({"rxn_smiles": []}), pd.Series),
+    ],
+)
+def test_RxnToCgrTransform_empty_inputs(empty_input, expected_type):
+    """Test RxnToCgrTransform call for empty inputs."""
+    transform = RxnToCgrTransform(keep_atom_mapping=True, rxn_col="rxn_smiles")
+
+    result = transform(empty_input)
+
+    assert isinstance(result, expected_type)
+
+    if isinstance(result, (list, pd.Series)):
+        assert len(result) == 0
+    elif isinstance(result, str):
+        assert result == ""
