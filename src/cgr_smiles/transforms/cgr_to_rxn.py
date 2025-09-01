@@ -1,7 +1,8 @@
 import re
 from collections import defaultdict
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
+import pandas as pd
 from rdkit import Chem
 
 from cgr_smiles.logger import logger
@@ -403,6 +404,78 @@ def get_chiral_center_map_nums(mol: Chem.Mol) -> List[int]:
     return atom_map_nums
 
 
+class CgrToRxnTransform:
+    """Transform reaction SMILES into CGR SMILES.
+
+    This class provides a callable interface to convert CGR SMILES into reaction
+    SMILES. It supports single strings, lists of strings, pandas Series, and
+    pandas DataFrames.
+
+    Attributes:
+        cgr_col (Optional[str]): Column name in a DataFrame containing CGR SMILES.
+
+    Examples:
+        Transform a pandas DataFrame of reactions into CGR SMILES:
+
+        >>> import pandas as pd
+        >>> df = pd.read_csv("path/to/file.csv")
+        >>> transform = CgrToRxnTransform(cgr_col="cgr_smiles")
+        >>> df["rxn_smiles"] = transform(df)
+    """
+
+    def __init__(
+        self,
+        cgr_col: Optional[str] = None,
+    ) -> None:
+        """Initialize the transformation object.
+
+        Args:
+            cgr_col (str, optional): Column name in a DataFrame containing
+                CGR SMILES. Required if passing a DataFrame. Defaults to None.
+        """
+        self.cgr_col = cgr_col
+
+    def __call__(
+        self, data: Union[str, List[str], pd.Series, pd.DataFrame]
+    ) -> Union[str, List[str], pd.Series, pd.DataFrame]:
+        """Apply the transformation to CGR SMILES.
+
+        Args:
+            data (Union[str, List[str], pd.Series, pd.DataFrame]): Input data
+                containing CGR SMILES. Can be a single string, a list of strings,
+                a pandas Series, or a pandas DataFrame.
+
+        Returns:
+            Union[str, List[str], pd.Series, pd.DataFrame]: Transformed CGR SMILES
+            in the same structure as the input.
+
+        Raises:
+            ValueError: If a DataFrame is provided but `self.cgr_col` is not set.
+            TypeError: If the input type is not supported.
+        """
+        if isinstance(data, str):
+            return cgrsmiles_to_rxnsmiles(data)
+
+        elif isinstance(data, list):
+            return [self(d) for d in data]
+
+        elif isinstance(data, pd.Series):
+            return data.apply(self)
+
+        elif isinstance(data, pd.DataFrame):
+            if self.cgr_col is None:
+                raise ValueError(
+                    f"A pandas DataFrame was provided, but `self.cgr_col` is not set.\n"
+                    f"Available columns are: {list(data.columns)}\n"
+                    "Please specify the column name containing the reactions by setting "
+                    "`cgr_col` at time of initialization."
+                )
+            return data[self.cgr_col].apply(self)
+
+        else:
+            raise TypeError("Input must be str, list, pandas Series, or DataFrame.")
+
+
 def cgrsmiles_to_rxnsmiles(cgr_smiles: str) -> str:
     """Converts a CGR SMILES string back into a reaction SMILES string.
 
@@ -424,6 +497,9 @@ def cgrsmiles_to_rxnsmiles(cgr_smiles: str) -> str:
         - Stereochemistry and chirality tags are preserved and corrected during reconstruction.
         - This function is the reverse transformation of `rxnsmiles_to_cgrsmiles`.
     """
+    if cgr_smiles == "":
+        return ""
+
     try:
         # TODO: start with a validity check, especially that each substitution pattern follows `{...|...}`.
 

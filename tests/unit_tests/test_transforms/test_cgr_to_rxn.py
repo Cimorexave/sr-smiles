@@ -3,6 +3,7 @@ import pytest
 from rdkit import Chem
 
 from cgr_smiles.transforms.cgr_to_rxn import (
+    CgrToRxnTransform,
     cgrsmiles_to_rxnsmiles,
     find_cis_trans_stereo_bonds,
     get_chiral_center_map_nums,
@@ -25,16 +26,17 @@ from cgr_smiles.utils import ROOT_DIR, canonicalize
 TEST_DATA_PATH = ROOT_DIR / "tests" / "data" / "cgr_test_cases.csv"
 
 
-def cgr_test_cases():
+def load_cgr_test_cases():
     """Loads test cases from a CSV file once per test module."""
     df = pd.read_csv(TEST_DATA_PATH)
-    return list(zip(df["rxn"], df["rxn_smiles"], df["cgr_smiles"]))
+    return df
 
 
-CGR_CASES = cgr_test_cases()
+DF = load_cgr_test_cases()
+CGR_TEST_CASES = list(zip(DF["rxn"], DF["rxn_smiles"], DF["cgr_smiles"]))
 
 
-@pytest.mark.parametrize("rxn_id, rxn_smiles, cgr_smiles", CGR_CASES)
+@pytest.mark.parametrize("rxn_id, rxn_smiles, cgr_smiles", CGR_TEST_CASES)
 def test_cgrsmiles_to_rxnsmiles(rxn_id, rxn_smiles, cgr_smiles):
     """Check that CGR to RXN conversion reproduces the original reaction SMILES."""
     res1 = cgrsmiles_to_rxnsmiles(cgr_smiles)
@@ -315,3 +317,93 @@ def test_get_chiral_center_map_nums_no_chirality():
     chiral_centers = get_chiral_center_map_nums(mol)
 
     assert chiral_centers == [], f"Expected no chiral centers, but got {chiral_centers}"
+
+
+def test_CgrToRxnTransform_single_string():
+    """Test CgrToRxnTransform class for single CGR SMILES."""
+    transform = CgrToRxnTransform()
+    cgr_smiles = DF.iloc[0]["cgr_smiles"]
+    exp_output = DF.iloc[0]["rxn_smiles"]
+    result = transform(cgr_smiles)
+
+    assert isinstance(result, str)
+    assert result == exp_output
+
+
+def test_CgrToRxnTransform_list_of_strings():
+    """Test CgrToRxnTransform class for a list of CGR SMILES."""
+    transform = CgrToRxnTransform()
+    cgr_smiles = DF["cgr_smiles"].tolist()
+    exp_output = DF["rxn_smiles"].tolist()
+
+    results = transform(cgr_smiles)
+
+    assert isinstance(results, list)
+    assert all(isinstance(r, str) for r in results)
+    for res, gt in zip(results, exp_output):
+        assert canonicalize(res) == canonicalize(gt)
+
+
+def test_CgrToRxnTransform_pd_series():
+    """Test CgrToRxnTransform class for a pd.Series input."""
+    transform = CgrToRxnTransform()
+    cgr_smiles = DF["cgr_smiles"]
+    exp_output = DF["rxn_smiles"]
+
+    results = transform(cgr_smiles)
+
+    assert isinstance(results, pd.Series)
+    assert all(isinstance(r, str) for r in results)
+    for res, gt in zip(results.tolist(), exp_output.tolist()):
+        assert canonicalize(res) == canonicalize(gt)
+
+
+def test_CgrToRxnTransform_pd_df():
+    """Test CgrToRxnTransform class for a pd.DataFrame input."""
+    transform = CgrToRxnTransform(cgr_col="cgr_smiles")
+    df_cgr_smiles = DF
+    exp_output = DF["rxn_smiles"]
+    results = transform(df_cgr_smiles)
+
+    assert isinstance(results, pd.Series)
+    assert all(isinstance(r, str) for r in results)
+    for res, gt in zip(results.tolist(), exp_output.tolist()):
+        assert canonicalize(res) == canonicalize(gt)
+
+
+def test_dataframe_without_cgr_col_raises():
+    """Test that CgrToRxnTransform raises ValueError if `self.cgr_col` not set."""
+    transform = CgrToRxnTransform()
+    df = pd.DataFrame({"cgr": ["CGR>>SMILES"]})
+    with pytest.raises(ValueError, match="`self.cgr_col` is not set"):
+        transform(df)
+
+
+def test_invalid_input_type():
+    """Test that CgrToRxnTransform raises TypeError if input type is not valid."""
+    transform = CgrToRxnTransform()
+    with pytest.raises(TypeError):
+        transform(12345)
+
+
+@pytest.mark.parametrize(
+    "empty_input,expected_type",
+    [
+        ("", str),
+        ([], list),
+        (pd.Series([], dtype=object), pd.Series),
+        (pd.DataFrame({"cgr_smiles": []}), pd.Series),
+    ],
+)
+def test_CgrToRxnTransform_empty_inputs(empty_input, expected_type):
+    """Test CgrToRxnTransform call for empty inputs."""
+    transform = CgrToRxnTransform(cgr_col="cgr_smiles")
+
+    result = transform(empty_input)
+
+    assert isinstance(result, expected_type)
+
+    if isinstance(result, (list, pd.Series)):
+        assert len(result) == 0
+    elif isinstance(result, str):
+        assert result == ""

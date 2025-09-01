@@ -148,8 +148,6 @@ class RxnToCgrTransform:
             data (Union[str, List[str], pd.Series, pd.DataFrame]): Input data
                 containing reaction SMILES. Can be a single string, a list of
                 strings, a pandas Series, or a pandas DataFrame.
-            rxn_col (str, optional): Column name to use if `data` is a DataFrame.
-                Overrides the instance attribute `self.rxn_col` if provided.
 
         Returns:
             Union[str, List[str], pd.Series, pd.DataFrame]: Transformed CGR SMILES
@@ -179,7 +177,7 @@ class RxnToCgrTransform:
                     f"A pandas DataFrame was provided, but `self.rxn_col` is not set.\n"
                     f"Available columns are: {list(data.columns)}\n"
                     "Please specify the column name containing the reactions by setting "
-                    "`self.rxn_col` at time of initialization."
+                    "`rxn_col` at time of initialization."
                 )
             return data[self.rxn_col].apply(self)
 
