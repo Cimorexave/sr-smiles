@@ -127,7 +127,7 @@ def remove_bonds_by_atom_map_nums(mol: Chem.Mol, atom_map_pairs: List[Tuple[int,
     Returns:
         Chem.Mol: A new RDKit molecule object with the specified bonds removed.
             If a bond corresponding to a given pair of atom map numbers does not exist,
-            a warning is printed, and that pair is skipped.
+            a warning is logged, and that pair is skipped.
 
     """
     atom_map_to_idx = {}
@@ -145,7 +145,7 @@ def remove_bonds_by_atom_map_nums(mol: Chem.Mol, atom_map_pairs: List[Tuple[int,
         if bond:
             bonds_to_remove_by_idx.append((idx1, idx2))
         else:
-            print(f"Warning: No bond found between atom map numbers {am1} and {am2}. Skipping removal.")
+            logger.warning(f"No bond found between atom map numbers {am1} and {am2}. Skipping removal.")
 
     for idx1, idx2 in bonds_to_remove_by_idx:
         emol.RemoveBond(idx1, idx2)
