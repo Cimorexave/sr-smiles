@@ -86,7 +86,6 @@ def add_atom_mapping(
         # TODO: check if the rxn_smiles is partially mapped, if so print a warning, that the rxnmapper was trained to predict mapping for unmapped reaction, therefore the present mapping will be stripped.  # noqa: E501
         # NOTE: RXNMapper handles only unmapped reactions correctly. erformance drops for unbalanced reactions
         result = mapper.get_attention_guided_atom_maps([rxn_smiles], canonicalize_rxns=canonical)
-        print(f"result = {result}")
         if not result or "mapped_rxn" not in result[0]:
             raise ValueError(f"RxnMapper failed to map reaction: {rxn_smiles}")
         return result[0]["mapped_rxn"]

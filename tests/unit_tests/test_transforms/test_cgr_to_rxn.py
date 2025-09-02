@@ -3,8 +3,8 @@ import pytest
 from rdkit import Chem
 
 from cgr_smiles.transforms.cgr_to_rxn import (
-    CgrToRxnTransform,
-    cgrsmiles_to_rxnsmiles,
+    CgrToRxn,
+    cgr_to_rxn,
     find_cis_trans_stereo_bonds,
     get_chiral_center_map_nums,
     get_reac_prod_scaffold_smiles_from_cgr,
@@ -37,9 +37,9 @@ CGR_TEST_CASES = list(zip(DF["rxn"], DF["rxn_smiles"], DF["cgr_smiles"]))
 
 
 @pytest.mark.parametrize("rxn_id, rxn_smiles, cgr_smiles", CGR_TEST_CASES)
-def test_cgrsmiles_to_rxnsmiles(rxn_id, rxn_smiles, cgr_smiles):
+def test_cgr_to_rxn(rxn_id, rxn_smiles, cgr_smiles):
     """Check that CGR to RXN conversion reproduces the original reaction SMILES."""
-    res1 = cgrsmiles_to_rxnsmiles(cgr_smiles)
+    res1 = cgr_to_rxn(cgr_smiles)
     rxn2 = canonicalize(rxn_smiles)
     res2 = canonicalize(res1)
     assert rxn2 == res2, f"Assertion error for reaction with id {rxn_id}"
@@ -50,7 +50,7 @@ def test_cgr_to_rxn_invalid_smiles(propagated_logger, caplog):
     bad_smi = "INVALID-CGR-SMILES"
 
     with caplog.at_level("WARNING", logger=propagated_logger.name):
-        result = cgrsmiles_to_rxnsmiles(bad_smi)
+        result = cgr_to_rxn(bad_smi)
 
     assert result == ""
     assert len(caplog.records) == 1
@@ -116,9 +116,9 @@ E_Z_STEREO_CASES = e_z_stereo_test_cases()
 
 
 @pytest.mark.parametrize("idx, rxn_smiles, cgr_smiles", E_Z_STEREO_CASES)
-def test_rxnsmiles_to_cgrsmiles_e_z_stereo(idx, rxn_smiles, cgr_smiles):
+def test_cgr_to_rxn_e_z_stereo(idx, rxn_smiles, cgr_smiles):
     """Check that E/Z stereochemistry is correctly preserved in RXN->CGR->RXN conversion."""
-    result = cgrsmiles_to_rxnsmiles(cgr_smiles)
+    result = cgr_to_rxn(cgr_smiles)
     can_res = canonicalize(result)
     can_rxn = canonicalize(rxn_smiles)
     assert can_res == can_rxn, f"Assertion error for reaction with id {idx}"
@@ -319,9 +319,9 @@ def test_get_chiral_center_map_nums_no_chirality():
     assert chiral_centers == [], f"Expected no chiral centers, but got {chiral_centers}"
 
 
-def test_CgrToRxnTransform_single_string():
-    """Test CgrToRxnTransform class for single CGR SMILES."""
-    transform = CgrToRxnTransform()
+def test_CgrToRxn_single_string():
+    """Test CgrToRxn class for single CGR SMILES."""
+    transform = CgrToRxn()
     cgr_smiles = DF.iloc[0]["cgr_smiles"]
     exp_output = DF.iloc[0]["rxn_smiles"]
     result = transform(cgr_smiles)
@@ -330,9 +330,9 @@ def test_CgrToRxnTransform_single_string():
     assert result == exp_output
 
 
-def test_CgrToRxnTransform_list_of_strings():
-    """Test CgrToRxnTransform class for a list of CGR SMILES."""
-    transform = CgrToRxnTransform()
+def test_CgrToRxn_list_of_strings():
+    """Test CgrToRxn class for a list of CGR SMILES."""
+    transform = CgrToRxn()
     cgr_smiles = DF["cgr_smiles"].tolist()
     exp_output = DF["rxn_smiles"].tolist()
 
@@ -344,9 +344,9 @@ def test_CgrToRxnTransform_list_of_strings():
         assert canonicalize(res) == canonicalize(gt)
 
 
-def test_CgrToRxnTransform_pd_series():
-    """Test CgrToRxnTransform class for a pd.Series input."""
-    transform = CgrToRxnTransform()
+def test_CgrToRxn_pd_series():
+    """Test CgrToRxn class for a pd.Series input."""
+    transform = CgrToRxn()
     cgr_smiles = DF["cgr_smiles"]
     exp_output = DF["rxn_smiles"]
 
@@ -358,9 +358,9 @@ def test_CgrToRxnTransform_pd_series():
         assert canonicalize(res) == canonicalize(gt)
 
 
-def test_CgrToRxnTransform_pd_df():
-    """Test CgrToRxnTransform class for a pd.DataFrame input."""
-    transform = CgrToRxnTransform(cgr_col="cgr_smiles")
+def test_CgrToRxn_pd_df():
+    """Test CgrToRxn class for a pd.DataFrame input."""
+    transform = CgrToRxn(cgr_col="cgr_smiles")
     df_cgr_smiles = DF
     exp_output = DF["rxn_smiles"]
     results = transform(df_cgr_smiles)
@@ -372,16 +372,16 @@ def test_CgrToRxnTransform_pd_df():
 
 
 def test_dataframe_without_cgr_col_raises():
-    """Test that CgrToRxnTransform raises ValueError if `self.cgr_col` not set."""
-    transform = CgrToRxnTransform()
+    """Test that CgrToRxn raises ValueError if `self.cgr_col` not set."""
+    transform = CgrToRxn()
     df = pd.DataFrame({"cgr": ["CGR>>SMILES"]})
     with pytest.raises(ValueError, match="`self.cgr_col` is not set"):
         transform(df)
 
 
 def test_invalid_input_type():
-    """Test that CgrToRxnTransform raises TypeError if input type is not valid."""
-    transform = CgrToRxnTransform()
+    """Test that CgrToRxn raises TypeError if input type is not valid."""
+    transform = CgrToRxn()
     with pytest.raises(TypeError):
         transform(12345)
 
@@ -395,9 +395,9 @@ def test_invalid_input_type():
         (pd.DataFrame({"cgr_smiles": []}), pd.Series),
     ],
 )
-def test_CgrToRxnTransform_empty_inputs(empty_input, expected_type):
-    """Test CgrToRxnTransform call for empty inputs."""
-    transform = CgrToRxnTransform(cgr_col="cgr_smiles")
+def test_CgrToRxn_empty_inputs(empty_input, expected_type):
+    """Test CgrToRxn call for empty inputs."""
+    transform = CgrToRxn(cgr_col="cgr_smiles")
 
     result = transform(empty_input)
 

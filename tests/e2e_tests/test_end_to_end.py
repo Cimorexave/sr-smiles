@@ -3,8 +3,8 @@ import csv
 import pandas as pd
 import pytest
 
-from cgr_smiles.transforms.cgr_to_rxn import cgrsmiles_to_rxnsmiles
-from cgr_smiles.transforms.rxn_to_cgr import rxnsmiles_to_cgrsmiles
+from cgr_smiles.transforms.cgr_to_rxn import cgr_to_rxn
+from cgr_smiles.transforms.rxn_to_cgr import rxn_to_cgr
 from cgr_smiles.utils import ROOT_DIR, canonicalize
 
 TEST_DATA_PATH = ROOT_DIR / "tests" / "data"
@@ -78,8 +78,8 @@ test_cases, ids = generate_individual_tests()
 def test_roundtrip_per_sample(file_path, idx, rxn_smiles, rxn_col):
     """Test single sample roundtrip (RXN -> CGR -> RXN)."""
     rxn_can = canonicalize(rxn_smiles)
-    cgr = rxnsmiles_to_cgrsmiles(rxn_smiles, keep_atom_mapping=True)
-    res = cgrsmiles_to_rxnsmiles(cgr)
+    cgr = rxn_to_cgr(rxn_smiles, keep_atom_mapping=True)
+    res = cgr_to_rxn(cgr)
     res_can = canonicalize(res)
 
     if res_can != rxn_can:

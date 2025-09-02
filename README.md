@@ -41,10 +41,10 @@ You can use the library in three different ways:
 This is suitable to get started, and especially if you wanna use it for single reaction smiles
 
 ```python
-from cgr_smiles import cgrsmile_to_rxn_smiles
+from cgr_smiles import cgr_to_rxn
 
 rxn = "[C:1].[O:2]=[O:3]>>[O:2]=[C:1]=[O:3]"
-cgr = cgrsmile_to_rxn_smiles(rxn)
+cgr = cgr_to_rxn(rxn)
 print(cgr)
 ```
 ```python
@@ -53,15 +53,15 @@ print(cgr)
 
 
 ### 3. Use the class interface
-If you wanna apply the CGR-SMILES transformation to a bigger batch of data, you can use this class `RxnToCgrTransform`. Especially if your reaction smiles are stored in a pd dataframe, then give, the df, the col name, and the
+If you wanna apply the CGR-SMILES transformation to a bigger batch of data, you can use this class `RxnToCgr`. Especially if your reaction smiles are stored in a pd dataframe, then give, the df, the col name, and the
 
 ```python
-from cgr_smiles import RxnToCgrTransform
+from cgr_smiles import RxnToCgr
 
 df = pd.read_csv("some/file.csv")
 col_name = "rxn_smiles"
 
-transform = RxnToCgrTransform()
+transform = RxnToCgr()
 df = converter.transform(df)
 print(cgr)
 ```

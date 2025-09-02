@@ -93,7 +93,7 @@ def remove_redundant_brackets(cgr: str) -> str:
     return cgr
 
 
-class RxnToCgrTransform:
+class RxnToCgr:
     """Transform reaction SMILES into CGR SMILES.
 
     This class provides a callable interface to convert reaction SMILES into
@@ -111,7 +111,7 @@ class RxnToCgrTransform:
 
         >>> import pandas as pd
         >>> df = pd.read_csv("path/to/file.csv")
-        >>> transform = RxnToCgrTransform(rxn_col="rxn_smiles")
+        >>> transform = RxnToCgr(rxn_col="rxn_smiles")
         >>> df["cgr_smiles"] = transform(df)
     """
 
@@ -158,7 +158,7 @@ class RxnToCgrTransform:
             TypeError: If the input type is not supported.
         """
         if isinstance(data, str):
-            return rxnsmiles_to_cgrsmiles(
+            return rxn_to_cgr(
                 data,
                 keep_atom_mapping=self.keep_atom_mapping,
                 remove_brackets=self.remove_brackets,
@@ -190,7 +190,7 @@ class RxnToCgrTransform:
 # TODO: standardize atom order depending on unmapped reactants, then add mappings again. Make the cgr molecule from this canonicalized reactant molecule to get maximum reproducibility  # noqa: E501
 # TODO: Make this also work for unbalanced rxns
 # DONE: als make unmapped version of the cgrsmiles
-def rxnsmiles_to_cgrsmiles(
+def rxn_to_cgr(
     rxn_smi: str,
     keep_atom_mapping: bool = False,
     remove_brackets: bool = False,
@@ -223,7 +223,7 @@ def rxnsmiles_to_cgrsmiles(
         >>> smi_reac = "[C:1]([H:3])([H:4])([H:5])[H:6].[Cl:2][H:7]"
         >>> smi_prod = "[C:1]([H:3])([H:4])([H:5])[Cl:2].[H:6][H:7]"
         >>> rxn_smiles = f"{smi_reac}>>{smi_prod}"
-        >>> rxnsmiles_to_cgrsmiles(rxn_smiles)
+        >>> rxn_to_cgr(rxn_smiles)
         "[C:1]1([H:3])([H:4])([H:5]){-|~}[H:6]{~|-}[H:7]{-|~}[Cl:2]{~|-}1"
 
         # In the resulting CGR SMILES, the `{reac|prod}` notation encodes how atoms and bonds

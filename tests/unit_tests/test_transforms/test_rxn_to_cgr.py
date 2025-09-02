@@ -2,10 +2,10 @@ import pandas as pd
 import pytest
 
 from cgr_smiles.transforms.rxn_to_cgr import (
-    RxnToCgrTransform,
+    RxnToCgr,
     remove_redundant_brackets,
     remove_redundant_brackets_and_hydrogens,
-    rxnsmiles_to_cgrsmiles,
+    rxn_to_cgr,
 )
 from cgr_smiles.utils import ROOT_DIR
 
@@ -23,9 +23,9 @@ CGR_TEST_CASES = list(zip(DF["rxn"], DF["rxn_smiles"], DF["cgr_smiles"]))
 
 
 @pytest.mark.parametrize("rxn_id, rxn_smiles, cgr_smiles", CGR_TEST_CASES)
-def test_rxnsmiles_to_cgrsmiles(rxn_id, rxn_smiles, cgr_smiles):
+def test_rxn_to_cgr(rxn_id, rxn_smiles, cgr_smiles):
     """Test the RXN to CGR (forward) transformation."""
-    result = rxnsmiles_to_cgrsmiles(rxn_smiles, keep_atom_mapping=True)
+    result = rxn_to_cgr(rxn_smiles, keep_atom_mapping=True)
     assert result == cgr_smiles, f"Assertion error for reaction with id {rxn_id}"
 
 
@@ -81,9 +81,9 @@ def e_z_stereo_test_cases():
 
 
 @pytest.mark.parametrize("idx, rxn_smiles, cgr_smiles", e_z_stereo_test_cases())
-def test_rxnsmiles_to_cgrsmiles_e_z_stereo(idx, rxn_smiles, cgr_smiles):
+def test_rxn_to_cgr_e_z_stereo(idx, rxn_smiles, cgr_smiles):
     """Test E/Z stereo changes in RXN to CGR transformation."""
-    result = rxnsmiles_to_cgrsmiles(rxn_smiles, keep_atom_mapping=True)
+    result = rxn_to_cgr(rxn_smiles, keep_atom_mapping=True)
     assert result == cgr_smiles, f"Assertion error for reaction with id {idx}"
 
 
@@ -92,7 +92,7 @@ def test_rxn_to_cgr_invalid_smiles(propagated_logger, caplog):
     bad_smi = "INVALID-RXN-SMILES"
 
     with caplog.at_level("WARNING", logger=propagated_logger.name):
-        result = rxnsmiles_to_cgrsmiles(bad_smi)
+        result = rxn_to_cgr(bad_smi)
 
     assert result == ""
     assert len(caplog.records) == 1
@@ -136,9 +136,9 @@ def test_remove_redundant_brackets(cgr, expected):
     assert remove_redundant_brackets(cgr) == expected
 
 
-def test_RxnToCgrTransform_single_string():
-    """Test RxnToCgrTransform class for single reaction."""
-    transform = RxnToCgrTransform(keep_atom_mapping=True)
+def test_RxnToCgr_single_string():
+    """Test RxnToCgr class for single reaction."""
+    transform = RxnToCgr(keep_atom_mapping=True)
     rxn_smiles = DF.iloc[0]["rxn_smiles"]
     exp_output = DF.iloc[0]["cgr_smiles"]
     result = transform(rxn_smiles)
@@ -147,9 +147,9 @@ def test_RxnToCgrTransform_single_string():
     assert result == exp_output
 
 
-def test_RxnToCgrTransform_list_of_strings():
-    """Test RxnToCgrTransform class for a list of reactions."""
-    transform = RxnToCgrTransform(keep_atom_mapping=True)
+def test_RxnToCgr_list_of_strings():
+    """Test RxnToCgr class for a list of reactions."""
+    transform = RxnToCgr(keep_atom_mapping=True)
     rxn_smiles = DF["rxn_smiles"].tolist()
     exp_output = DF["cgr_smiles"].tolist()
 
@@ -160,9 +160,9 @@ def test_RxnToCgrTransform_list_of_strings():
     assert results == exp_output
 
 
-def test_RxnToCgrTransform_pd_series():
-    """Test RxnToCgrTransform class for a pd.Series input."""
-    transform = RxnToCgrTransform(keep_atom_mapping=True)
+def test_RxnToCgr_pd_series():
+    """Test RxnToCgr class for a pd.Series input."""
+    transform = RxnToCgr(keep_atom_mapping=True)
     rxn_smiles = DF["rxn_smiles"]
     exp_output = DF["cgr_smiles"]
 
@@ -173,9 +173,9 @@ def test_RxnToCgrTransform_pd_series():
     assert results.equals(exp_output)
 
 
-def test_RxnToCgrTransform_pd_df():
-    """Test RxnToCgrTransform class for a pd.Series object."""
-    transform = RxnToCgrTransform(keep_atom_mapping=True, rxn_col="rxn_smiles")
+def test_RxnToCgr_pd_df():
+    """Test RxnToCgr class for a pd.Series object."""
+    transform = RxnToCgr(keep_atom_mapping=True, rxn_col="rxn_smiles")
     df_rxn_smiles = DF
     exp_output = DF["cgr_smiles"]
     results = transform(df_rxn_smiles)
@@ -186,16 +186,16 @@ def test_RxnToCgrTransform_pd_df():
 
 
 def test_dataframe_without_rxn_col_raises():
-    """Test that RxnToCgrTransform call raises a ValueError isf `self.rxn_col` not set."""
-    transform = RxnToCgrTransform(keep_atom_mapping=True)
+    """Test that RxnToCgr call raises a ValueError isf `self.rxn_col` not set."""
+    transform = RxnToCgr(keep_atom_mapping=True)
     df = pd.DataFrame({"rxn": ["A>>B"]})
     with pytest.raises(ValueError, match="`self.rxn_col` is not set"):
         transform(df)
 
 
 def test_invalid_input_type():
-    """Test that RxnToCgrTransform call raises a TypeError if input type is not valid."""
-    transform = RxnToCgrTransform(keep_atom_mapping=True)
+    """Test that RxnToCgr call raises a TypeError if input type is not valid."""
+    transform = RxnToCgr(keep_atom_mapping=True)
     with pytest.raises(TypeError):
         transform(12345)
 
@@ -209,9 +209,9 @@ def test_invalid_input_type():
         (pd.DataFrame({"rxn_smiles": []}), pd.Series),
     ],
 )
-def test_RxnToCgrTransform_empty_inputs(empty_input, expected_type):
-    """Test RxnToCgrTransform call for empty inputs."""
-    transform = RxnToCgrTransform(keep_atom_mapping=True, rxn_col="rxn_smiles")
+def test_RxnToCgr_empty_inputs(empty_input, expected_type):
+    """Test RxnToCgr call for empty inputs."""
+    transform = RxnToCgr(keep_atom_mapping=True, rxn_col="rxn_smiles")
 
     result = transform(empty_input)
 

@@ -404,7 +404,7 @@ def get_chiral_center_map_nums(mol: Chem.Mol) -> List[int]:
     return atom_map_nums
 
 
-class CgrToRxnTransform:
+class CgrToRxn:
     """Transform reaction SMILES into CGR SMILES.
 
     This class provides a callable interface to convert CGR SMILES into reaction
@@ -419,7 +419,7 @@ class CgrToRxnTransform:
 
         >>> import pandas as pd
         >>> df = pd.read_csv("path/to/file.csv")
-        >>> transform = CgrToRxnTransform(cgr_col="cgr_smiles")
+        >>> transform = CgrToRxn(cgr_col="cgr_smiles")
         >>> df["rxn_smiles"] = transform(df)
     """
 
@@ -454,7 +454,7 @@ class CgrToRxnTransform:
             TypeError: If the input type is not supported.
         """
         if isinstance(data, str):
-            return cgrsmiles_to_rxnsmiles(data)
+            return cgr_to_rxn(data)
 
         elif isinstance(data, list):
             return [self(d) for d in data]
@@ -476,7 +476,7 @@ class CgrToRxnTransform:
             raise TypeError("Input must be str, list, pandas Series, or DataFrame.")
 
 
-def cgrsmiles_to_rxnsmiles(cgr_smiles: str) -> str:
+def cgr_to_rxn(cgr_smiles: str) -> str:
     """Converts a CGR SMILES string back into a reaction SMILES string.
 
     This function reverses a Condensed Graph of Reaction (CGR) SMILES representation
@@ -495,7 +495,7 @@ def cgrsmiles_to_rxnsmiles(cgr_smiles: str) -> str:
         - Each substitution pattern in the CGR SMILES should follow `{...|...}`.
         - Unspecified bonds (labeled as "~") are removed in the resulting molecules.
         - Stereochemistry and chirality tags are preserved and corrected during reconstruction.
-        - This function is the reverse transformation of `rxnsmiles_to_cgrsmiles`.
+        - This function is the reverse transformation of `rxn_to_cgr`.
     """
     if cgr_smiles == "":
         return ""
