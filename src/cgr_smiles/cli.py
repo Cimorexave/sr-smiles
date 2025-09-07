@@ -57,6 +57,16 @@ def print_banner(
     )
 
 
+def reverse_reaction_smiles(rxn_smiles: str) -> str:
+    """Reverse reaction smiles."""
+    if ">>" in rxn_smiles:
+        parts = rxn_smiles.split(">>")
+        return ">>".join(parts[::-1])
+    else:
+        logger.warning(f"No '>>' found in reaction SMILES: {rxn_smiles}")
+        return rxn_smiles
+
+
 def main_rxn2cgr():
     """CLI entry point: convert reaction SMILES to CGR SMILES in a CSV."""
     parser = argparse.ArgumentParser(description="Convert reaction SMILES to CGR SMILES")
@@ -68,6 +78,7 @@ def main_rxn2cgr():
     parser.add_argument("--remove-brackets", action="store_true", help="Remove brackets")
     parser.add_argument("--remove-hydrogens", action="store_true", help="Remove explicit hydrogens")
     parser.add_argument("--balance-rxn", action="store_true", help="Balance the given reaction")
+    parser.add_argument("--product-based", action="store_true", help="Balance the given reaction")
 
     args = parser.parse_args()
 
@@ -94,7 +105,14 @@ def main_rxn2cgr():
     )
 
     tqdm.pandas()
-    df[args.cgr_col] = df[args.rxn_col].progress_apply(transform)
+    if args.product_based:
+        logger.info("Reverse reactions for product-based transformation")
+
+        df[f"{args.rxn_col}_reversed"] = df[args.rxn_col].progress_apply(reverse_reaction_smiles)
+        df[args.cgr_col] = df[f"{args.rxn_col}_reversed"].progress_apply(transform)
+    else:
+        df[args.cgr_col] = df[args.rxn_col].progress_apply(transform)
+
     logger.info("✅ Transformation complete.")
 
     output_path = args.output or args.csv_file
