@@ -6,7 +6,9 @@ import pandas as pd
 from rdkit import Chem
 
 from cgr_smiles.logger import logger
+from cgr_smiles.transforms.rxn_to_cgr import remove_redundant_brackets
 from cgr_smiles.utils import (
+    ORGANIC_SUBSET,
     TokenType,
     _tokenize,
     common_elements_preserving_order,
@@ -14,6 +16,7 @@ from cgr_smiles.utils import (
     flip_e_z_stereo,
     get_atom_map_adjacency_list_from_smiles,
     is_num_permutations_even,
+    remove_atom_mapping,
 )
 
 
@@ -413,6 +416,9 @@ class CgrToRxn:
 
     Attributes:
         cgr_col (Optional[str]): Column name in a DataFrame containing CGR SMILES.
+        add_atom_mapping (bool, optional): If True, ensures atom mappings are
+            present in the output RXN SMILES. If False, atom mappings are stripped
+            unless they were already present in the input. Default is False.
 
     Examples:
         Transform a pandas DataFrame of reactions into CGR SMILES:
@@ -426,14 +432,20 @@ class CgrToRxn:
     def __init__(
         self,
         cgr_col: Optional[str] = None,
+        add_atom_mapping: bool = False,
     ) -> None:
         """Initialize the transformation object.
 
         Args:
             cgr_col (str, optional): Column name in a DataFrame containing
                 CGR SMILES. Required if passing a DataFrame. Defaults to None.
+            add_atom_mapping (bool, optional): If True, ensures atom mappings are
+                present in the output RXN SMILES. If False, atom mappings are stripped
+                unless they were already present in the input. Default is False.
+
         """
         self.cgr_col = cgr_col
+        self.add_atom_mapping = add_atom_mapping
 
     def __call__(
         self, data: Union[str, List[str], pd.Series, pd.DataFrame]
@@ -454,7 +466,7 @@ class CgrToRxn:
             TypeError: If the input type is not supported.
         """
         if isinstance(data, str):
-            return cgr_to_rxn(data)
+            return cgr_to_rxn(data, self.add_atom_mapping)
 
         elif isinstance(data, list):
             return [self(d) for d in data]
@@ -476,7 +488,87 @@ class CgrToRxn:
             raise TypeError("Input must be str, list, pandas Series, or DataFrame.")
 
 
-def cgr_to_rxn(cgr_smiles: str) -> str:
+def is_cgr_smiles_fully_atom_mapped(cgr_smiles: str) -> bool:
+    """Checks if a CGR SMILES string is fully atom-mapped.
+
+    Checks according to the following definition:
+    - All CGRTOKENs ({...|...}) must have both alternatives atom-mapped with
+      the SAME map number.
+    - All TOKENs ([...]) must be atom-mapped.
+    """
+    atom_map_pattern = re.compile(r":\d+")
+
+    for tok_type, _, tok in _tokenize(cgr_smiles):
+        if tok_type == TokenType.ATOM:
+            if not atom_map_pattern.search(tok):
+                return False
+
+    return True
+
+
+def add_atom_mapping_to_cgr(cgr: str) -> str:
+    """Add atom mapping numbers to a CGR-SMILES string.
+
+    Each atom gets a continuous unique index: 1, 2, 3, ...
+    Atoms inside the same {...|...} group share one index.
+    """
+    atom_pattern = re.compile(r"(\[[^\]]+\]|[A-Z][a-z]?|[cnops])")
+    mapping_counter = 1
+
+    def insert_mapping(atom, idx):
+        if atom.startswith("["):
+            if re.search(r":\d+", atom) is not None:  # already has mapping
+                return atom
+            return atom[:-1] + f":{idx}]"
+        else:
+            return f"[{atom}:{idx}]"
+
+    out = []
+    i = 0
+
+    while i < len(cgr):
+        if cgr[i] == "{":  # handle group {...|...}
+            j = cgr.find("}", i)
+            group_content = cgr[i + 1 : j]
+
+            # recursively map inside group using same index
+            group_mapped = atom_pattern.sub(
+                lambda m: insert_mapping(m.group(), mapping_counter), group_content
+            )
+            if re.search(r":\d+", group_mapped) is not None:
+                mapping_counter += 1
+            out.append("{" + group_mapped + "}")
+            i = j + 1
+        else:
+            # try regex match
+            m = atom_pattern.match(cgr, i)
+            if m:
+                token = m.group()
+                # check case of uppercase+lowercase (like "Sc")
+                if (
+                    len(token) == 2
+                    and token[0].isupper()
+                    and token[1].islower()
+                    and token not in ORGANIC_SUBSET
+                ):
+                    # split into separate atoms
+                    # first uppercase
+                    out.append(insert_mapping(token[0], mapping_counter))
+                    mapping_counter += 1
+                    # then lowercase as separate atom token
+                    out.append(insert_mapping(token[1], mapping_counter))
+                    mapping_counter += 1
+                else:
+                    out.append(insert_mapping(token, mapping_counter))
+                    mapping_counter += 1
+                i = m.end()
+            else:
+                out.append(cgr[i])
+                i += 1
+    return "".join(out)
+
+
+def cgr_to_rxn(cgr_smiles: str, add_atom_mapping: bool = False) -> str:
     """Converts a CGR SMILES string back into a reaction SMILES string.
 
     This function reverses a Condensed Graph of Reaction (CGR) SMILES representation
@@ -487,6 +579,9 @@ def cgr_to_rxn(cgr_smiles: str) -> str:
     Args:
         cgr_smiles (str): A CGR SMILES string representing a reaction, where changes
             between reactants and products are encoded using `{reac|prod}` syntax.
+        add_atom_mapping (bool, optional): If True, ensures atom mappings are
+            present in the output RXN SMILES. If False, atom mappings are stripped
+            unless they were already present in the input. Default is False.
 
     Returns:
         str: The corresponding reaction SMILES string in the format "reactants>>products".
@@ -502,9 +597,15 @@ def cgr_to_rxn(cgr_smiles: str) -> str:
 
     try:
         # TODO: start with a validity check, especially that each substitution pattern follows `{...|...}`.
+        if not is_cgr_smiles_fully_atom_mapped(cgr_smiles):
+            cgr_smi = add_atom_mapping_to_cgr(cgr_smiles)
+            input_atom_mapped = False
+        else:
+            cgr_smi = cgr_smiles
+            input_atom_mapped = True
 
         # extract reac and prod smiles scaffold from cgr smiles
-        reac_smi1, prod_smi1 = get_reac_prod_scaffold_smiles_from_cgr(cgr_smiles)
+        reac_smi1, prod_smi1 = get_reac_prod_scaffold_smiles_from_cgr(cgr_smi)
 
         cgr_reac_scaffold = reac_smi1.replace("~", "")
         cgr_prod_scaffold = prod_smi1.replace("~", "")
@@ -541,7 +642,13 @@ def cgr_to_rxn(cgr_smiles: str) -> str:
         reac_smi4 = update_chirality_tags(reac_smi3, cgr_reac_scaffold, reac_map_num_of_chiral_centers)
         prod_smi4 = update_chirality_tags(prod_smi3, cgr_prod_scaffold, prod_map_num_of_chiral_centers)
 
-        return f"{reac_smi4}>>{prod_smi4}"
+        rxn_smiles = f"{reac_smi4}>>{prod_smi4}"
+
+        if not input_atom_mapped and not add_atom_mapping:
+            rxn_smiles = remove_atom_mapping(rxn_smiles)
+            rxn_smiles = remove_redundant_brackets(rxn_smiles)
+
+        return rxn_smiles
 
     except Exception as e:
         logger.warning(f"Failed to process CGR-SMILES '{cgr_smiles}'. Error: {e}. Returning empty string.")

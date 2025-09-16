@@ -616,6 +616,45 @@ def get_list_of_atom_map_numbers(smi: str) -> List[str]:
     return ams
 
 
+def get_list_of_atom_map_numbers_from_cgr_smiles(cgr_smi: str) -> List[str]:
+    """Extract all atom map numbers from a SMILES string in traversal order.
+
+    Args:
+        cgr_smi (str): A SMILES string potentially containing atom map numbers.
+
+    Returns:
+        List[int]: A list of atom map numbers as integers, extracted from left to right.
+    """
+    result = []
+
+    # Pattern for {...} groups
+    group_pattern = re.compile(r"\{([^}]*)\}")
+    # Pattern to capture :num] map indices
+    mapnum_pattern = re.compile(r":(\d+)\]")
+
+    pos = 0
+    for m in group_pattern.finditer(cgr_smi):
+        # process text before the group
+        before = cgr_smi[pos : m.start()]
+        result.extend(int(x) for x in mapnum_pattern.findall(before))
+
+        # process inside the group -> deduplicated numbers
+        inside = mapnum_pattern.findall(m.group(1))
+        seen = set()
+        for n in inside:
+            if n not in seen:
+                seen.add(n)
+                result.append(int(n))
+
+        pos = m.end()
+
+    # process the tail after the last group
+    tail = cgr_smi[pos:]
+    result.extend(int(x) for x in mapnum_pattern.findall(tail))
+
+    return result
+
+
 def get_atom_indices_and_smarts(mol: Chem.Mol) -> List[Tuple[int, str]]:
     """Extract each atom's index and its corresponding SMARTS representation from the molecule.
 

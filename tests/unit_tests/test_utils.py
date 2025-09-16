@@ -14,6 +14,7 @@ from cgr_smiles.utils import (
     get_atom_map_num,
     get_bond_idx,
     get_list_of_atom_map_numbers,
+    get_list_of_atom_map_numbers_from_cgr_smiles,
     includes_individually_mapped_hydrogens,
     is_num_permutations_even,
     map_reac_to_prod,
@@ -480,6 +481,13 @@ def test_get_list_of_atom_map_numbers():
     """Check that all atom map numbers are extracted in SMILES traversal order."""
     smiles = "[C:4]([H:9])#[C:3][C@@:2]1([H:8])[N:6]=[C:5]1[O:1][H:7]"
     map_nums = get_list_of_atom_map_numbers(smiles)
+    assert map_nums == [4, 9, 3, 2, 8, 6, 5, 1, 7]
+
+
+def test_get_list_of_atom_map_numbers_from_cgr_smiles():
+    """Check that all atom map numbers are extracted in SMILES traversal order."""
+    cgr = "{[C:4]|[CH:4]}([H:9])#[C:3][C@@:2]1([H:8]){[N:6]|[N+:6]}{=|-}[C:5]1[O:1][H:7]"
+    map_nums = get_list_of_atom_map_numbers_from_cgr_smiles(cgr)
     assert map_nums == [4, 9, 3, 2, 8, 6, 5, 1, 7]
 
 

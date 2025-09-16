@@ -1,18 +1,22 @@
 import pandas as pd
 import pytest
+from conftest import equivalent_reactions
 from rdkit import Chem
 
 from cgr_smiles.transforms.cgr_to_rxn import (
     CgrToRxn,
+    add_atom_mapping_to_cgr,
     cgr_to_rxn,
     find_cis_trans_stereo_bonds,
     get_chiral_center_map_nums,
     get_reac_prod_scaffold_smiles_from_cgr,
+    is_cgr_smiles_fully_atom_mapped,
     parse_bonds_from_smiles,
     remove_bonds_by_atom_map_nums,
     update_chirality_tags,
     update_cis_trans_stereo_chem,
 )
+from cgr_smiles.transforms.rxn_to_cgr import rxn_to_cgr
 from cgr_smiles.utils import ROOT_DIR, canonicalize
 
 # TODO: test case: F/C=C/C=C/C
@@ -43,6 +47,57 @@ def test_cgr_to_rxn(rxn_id, rxn_smiles, cgr_smiles):
     rxn2 = canonicalize(rxn_smiles)
     res2 = canonicalize(res1)
     assert rxn2 == res2, f"Assertion error for reaction with id {rxn_id}"
+
+
+@pytest.mark.parametrize("rxn_id, rxn_smiles, cgr_smiles", CGR_TEST_CASES)
+def test_cgr_to_rxn2(rxn_id, rxn_smiles, cgr_smiles):
+    """Check that CGR to RXN conversion reproduces the original reaction SMILES."""
+    cgr = rxn_to_cgr(rxn_smiles, remove_brackets=True, remove_hydrogens=True)
+    rxn = cgr_to_rxn(cgr, add_atom_mapping=True)
+
+    assert equivalent_reactions(rxn_smiles, rxn)
+
+
+@pytest.mark.parametrize(
+    "cgr, expected",
+    [
+        (
+            "CC(C)(C)OC(=O)O{-|~}C(OC(C)(C)C)(=O){~|-}{[nH]|n}1c2ccc(C(C)=O)cc2cc1",
+            "[C:1][C:2]([C:3])([C:4])[O:5][C:6](=[O:7])[O:8]{-|~}[C:9]([O:10][C:11]([C:12])([C:13])[C:14])(=[O:15]){~|-}{[nH:16]|[n:16]}1[c:17]2[c:18][c:19][c:20]([C:21]([C:22])=[O:23])[c:24][c:25]2[c:26][c:27]1",
+        ),
+        (
+            "F{-|/}[CH]=[CH]{-|/}{F|[F+]}",
+            "[F:1]{-|/}[CH:2]=[CH:3]{-|/}{[F:4]|[F+:4]}",
+        ),
+        (
+            "C[Sc]C{C|[CH]}",
+            "[C:1][Sc:2][C:3]{[C:4]|[CH:4]}",
+        ),
+        (
+            "CScc{C|[CH]}",
+            "[C:1][S:2][c:3][c:4]{[C:5]|[CH:5]}",
+        ),
+        (
+            "CClc{C|[CH]}",
+            "[C:1][Cl:2][c:3]{[C:4]|[CH:4]}",
+        ),
+        (
+            "ccc{C|[C+]}",
+            "[c:1][c:2][c:3]{[C:4]|[C+:4]}",
+        ),
+        (
+            "ccc{[C-]|[C+]}",
+            "[c:1][c:2][c:3]{[C-:4]|[C+:4]}",
+        ),
+        (
+            "ccc{[C@H]|C}(C)(Br)N",
+            "[c:1][c:2][c:3]{[C@H:4]|[C:4]}([C:5])([Br:6])[N:7]",
+        ),
+    ],
+)
+def test_add_atom_mapping_to_cgr(cgr, expected):
+    """Add atom mapping to a CGR SMILES."""
+    assert add_atom_mapping_to_cgr(cgr) == expected
 
 
 def test_cgr_to_rxn_invalid_smiles(propagated_logger, caplog):
@@ -407,3 +462,33 @@ def test_CgrToRxn_empty_inputs(empty_input, expected_type):
         assert len(result) == 0
     elif isinstance(result, str):
         assert result == ""
+
+
+@pytest.mark.parametrize(
+    "cgr_smiles,is_fully_mapped",
+    [
+        ("{[O:1]|[O+:1]}[C:2]([C:3])", True),
+        ("{[O:1]|[O+:1]}[C:5]([C:2])", True),
+        ("{O|[O+]}C(C)", False),
+        ("{[O:1]|[O+:1]}C([C:2])", False),
+    ],
+)
+def test_is_cgr_smiles_fully_atom_mapped(cgr_smiles, is_fully_mapped):
+    """Check if a CGR SMILES is fully atom mapped."""
+    assert is_cgr_smiles_fully_atom_mapped(cgr_smiles) == is_fully_mapped
+
+
+def test_cgr_to_rxn_keep_atom_mapping():
+    """Test cgr2rxn with unmapped cgr smiles."""
+    cgr = "F{-|/}[CH]=[CH]{-|/}{F|[F+]}"
+    cgr_with_map = cgr_to_rxn(cgr, add_atom_mapping=True)
+    expected = "[F:1][CH:2]=[CH:3][F:4]>>[F:1]/[CH:2]=[CH:3]/[F+:4]"
+    assert cgr_with_map == expected
+
+
+def test_cgr_to_rxn_do_not_keep_atom_mapping():
+    """Test cgr2rxn with unmapped cgr smiles."""
+    cgr = "F{-|/}[CH]=[CH]{-|/}{F|[F+]}"
+    cgr_with_map = cgr_to_rxn(cgr, add_atom_mapping=False)
+    expected = "F[CH]=[CH]F>>F/[CH]=[CH]/[F+]"
+    assert cgr_with_map == expected

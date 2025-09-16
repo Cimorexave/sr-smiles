@@ -95,6 +95,22 @@ def test_rxn_to_cgr_use_aromaticity(use_aromaticity):
     assert use_aromaticity == ("c" in cgr_smi)
 
 
+def test_rxn_to_cgr_keep_aromatic_bonds():
+    """Test `keep_aromatic_bonds=True` in `rxn_to_cgr()`."""
+    rxn_smi = "[C:6]([O:5][C:2]([CH3:4])([CH3:3])[CH3:1])(=[O:7])OC(=O)OC(C)(C)C.[cH:13]1[cH:12][c:11]([C:9]([CH3:8])=[O:10])[cH:19][c:18]2[cH:17][cH:16][nH:15][c:14]12>>[c:14]12[c:18]([cH:19][c:11]([C:9](=[O:10])[CH3:8])[cH:12][cH:13]1)[cH:17][cH:16][n:15]2[C:6]([O:5][C:2]([CH3:1])([CH3:3])[CH3:4])=[O:7]"  # noqa: E501
+    cgr_smi = rxn_to_cgr(rxn_smi, balance_rxn=True, keep_aromatic_bonds=True, remove_brackets=True)
+    expected = "C(OC([CH3])([CH3])[CH3])(=O)({-|~}{O|[OH]}C(=O)OC([CH3])([CH3])[CH3]){~|-}{[nH]|n}1:[cH]:[cH]:c2:[cH]:c(C([CH3])=O):[cH]:[cH]:c:2:1"  # noqa: E501
+    assert cgr_smi == expected
+
+
+def test_rxn_to_cgr_do_not_keep_aromatic_bonds():
+    """Test `keep_aromatic_bonds=False` in `rxn_to_cgr()`."""
+    rxn_smi = "[C:6]([O:5][C:2]([CH3:4])([CH3:3])[CH3:1])(=[O:7])OC(=O)OC(C)(C)C.[cH:13]1[cH:12][c:11]([C:9]([CH3:8])=[O:10])[cH:19][c:18]2[cH:17][cH:16][nH:15][c:14]12>>[c:14]12[c:18]([cH:19][c:11]([C:9](=[O:10])[CH3:8])[cH:12][cH:13]1)[cH:17][cH:16][n:15]2[C:6]([O:5][C:2]([CH3:1])([CH3:3])[CH3:4])=[O:7]"  # noqa: E501
+    cgr_smi = rxn_to_cgr(rxn_smi, balance_rxn=True, keep_aromatic_bonds=False, remove_brackets=True)
+    expected = "C(OC([CH3])([CH3])[CH3])(=O)({-|~}{O|[OH]}C(=O)OC([CH3])([CH3])[CH3]){~|-}{[nH]|n}1[cH][cH]c2[cH]c(C([CH3])=O)[cH][cH]c21"  # noqa: E501
+    assert cgr_smi == expected
+
+
 def test_rxn_to_cgr_invalid_smiles(propagated_logger, caplog):
     """Verify that invalid RXN SMILES input logs a warning and returns an empty string."""
     bad_smi = "INVALID-RXN-SMILES"
