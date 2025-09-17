@@ -11,6 +11,7 @@ from cgr_smiles.transforms.cgr_to_rxn import (
     get_chiral_center_map_nums,
     get_reac_prod_scaffold_smiles_from_cgr,
     is_cgr_smiles_fully_atom_mapped,
+    is_kekule,
     parse_bonds_from_smiles,
     remove_bonds_by_atom_map_nums,
     update_chirality_tags,
@@ -492,3 +493,56 @@ def test_cgr_to_rxn_do_not_keep_atom_mapping():
     cgr_with_map = cgr_to_rxn(cgr, add_atom_mapping=False)
     expected = "F[CH]=[CH]F>>F/[CH]=[CH]/[F+]"
     assert cgr_with_map == expected
+
+
+def test_cgr_to_rxn_in_kekule_form():
+    """Check CGR to RXN conversion on a non-aromatic CGR string."""
+    cgr = "C1(C(C)=O)=CC=C2C(=C1)C=CN2{-|~}C(=O)(OC(C)(C)C){~|-}O"
+    r, p = cgr_to_rxn(cgr).split(">>")
+
+    exp_r = "C1(C(C)=O)=CC=C2C(=C1)C=CN2C(=O)OC(C)(C)C.O"
+    exp_p = "C1(C(C)=O)=CC=C2C(=C1)C=CN2.C(=O)(OC(C)(C)C)O"
+
+    assert r == exp_r
+    assert p == exp_p
+
+
+def test_cgr_to_rxn_cgr_not_in_kekule_form():
+    """Check CGR to RXN conversion on an aromatic CGR string."""
+    cgr = "c1(C(C)=O)ccc2c(c1){c|C}{:|=}{c|C}{n|N}2{-|~}C(=O)(OC(C)(C)C){~|-}O"
+    r, p = cgr_to_rxn(cgr).split(">>")
+
+    exp_r = "c1(C(C)=O)ccc2c(c1)ccn2C(=O)OC(C)(C)C.O"
+    exp_p = "c1(C(C)=O)ccc2c(c1)C=CN2.C(=O)(OC(C)(C)C)O"
+
+    assert r == exp_r
+    assert p == exp_p
+
+
+@pytest.mark.parametrize(
+    "smiles,kekule",
+    [
+        ("{[O:1]|[O+:1]}[C:2]([C:3])", True),
+        ("{[O:1]|[O+:1]}[C:5]([c:2])", False),
+    ],
+)
+def test_is_rxn_smiles_kekule(smiles, kekule):
+    """Check if a given RXN SMILES is kekulized."""
+    assert is_kekule(smiles) == kekule
+
+
+@pytest.mark.parametrize(
+    "smiles,kekule",
+    [
+        ("[O:1][C:2]([C:3])>>[O+:1][C:2]([C:3])", True),
+        ("[O:1][C:2]([Cl:3])>>[O+:1][C:2]([Br:3])", True),
+        ("[O:1][C:2]([C:3])>>[O+:1][C:2]([c:3])", False),
+        ("[O:1][C:2]([c:3])>>[O+:1][C:2]([C:3])", False),
+        ("[O:1][C:2]([c:3])>>[O+:1][C:2]([c:3])", False),
+        ("[O:1][C:2]([1c:3])>>[O+:1][C:2]([C:3])", False),
+        ("[O:1][C:2]([Cl:3])>>[O+:1][C:2]([c:3])", False),
+    ],
+)
+def test_is_cgr_smiles_kekule(smiles, kekule):
+    """Check if a given CGR SMILES is kekulized."""
+    assert is_kekule(smiles) == kekule

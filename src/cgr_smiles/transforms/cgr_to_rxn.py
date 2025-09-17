@@ -568,6 +568,23 @@ def add_atom_mapping_to_cgr(cgr: str) -> str:
     return "".join(out)
 
 
+def is_kekule(atom_mapped_rxn_smi: str) -> bool:
+    """Check if a iven RXN SMILES is kekulized.
+
+    Return True if all bracketed atoms in a mapped reaction SMILES string
+    use Kekulé (uppercase) element symbols, i.e. no lowercase aromatic
+    symbols like [c], [n], [o], etc. are present. Returns False otherwise.
+    """
+    for match in re.finditer(r"\[([^\]]+)\]", atom_mapped_rxn_smi):
+        content = match.group(1)
+        m = re.search(r"[A-Za-z]", content)
+        if m:
+            first = m.group(0)
+            if not first.isupper():
+                return False
+    return True
+
+
 def cgr_to_rxn(cgr_smiles: str, add_atom_mapping: bool = False) -> str:
     """Converts a CGR SMILES string back into a reaction SMILES string.
 
@@ -604,6 +621,8 @@ def cgr_to_rxn(cgr_smiles: str, add_atom_mapping: bool = False) -> str:
             cgr_smi = cgr_smiles
             input_atom_mapped = True
 
+        kekulized = is_kekule(cgr_smi)
+
         # extract reac and prod smiles scaffold from cgr smiles
         reac_smi1, prod_smi1 = get_reac_prod_scaffold_smiles_from_cgr(cgr_smi)
 
@@ -621,11 +640,12 @@ def cgr_to_rxn(cgr_smiles: str, add_atom_mapping: bool = False) -> str:
         # create the mols from the smiles and manually remove the bonds that are labelled as unspecified
         reac_mol = Chem.MolFromSmiles(reac_smi1.replace("~", ""), sanitize=False)
         prod_mol = Chem.MolFromSmiles(prod_smi1.replace("~", ""), sanitize=False)
-        Chem.SanitizeMol(prod_mol, Chem.SanitizeFlags.SANITIZE_ADJUSTHS)  # TODO also for reac
-        Chem.SanitizeMol(reac_mol, Chem.SanitizeFlags.SANITIZE_ADJUSTHS)  # TODO also for reac
-        reac_mol = remove_bonds_by_atom_map_nums(
-            reac_mol, reac_map_nums_unspecified_bonds
-        )  # smiles based patch needed while bug not fixed on rdkits end.
+
+        Chem.SanitizeMol(prod_mol, Chem.SanitizeFlags.SANITIZE_ADJUSTHS)
+        Chem.SanitizeMol(reac_mol, Chem.SanitizeFlags.SANITIZE_ADJUSTHS)
+
+        # smiles based patch needed while bug not fixed on rdkits end.
+        reac_mol = remove_bonds_by_atom_map_nums(reac_mol, reac_map_nums_unspecified_bonds)
         prod_mol = remove_bonds_by_atom_map_nums(prod_mol, prod_map_nums_unspecified_bonds)
 
         # update stereochem bonds / and \ (because apparently they get messed up along the way. this might not be neccessary anymore if previous bug gets fixed.)  # noqa: E501
@@ -633,8 +653,8 @@ def cgr_to_rxn(cgr_smiles: str, add_atom_mapping: bool = False) -> str:
         prod_mol = update_cis_trans_stereo_chem(prod_mol, prod_parsed_bonds)
 
         # then get the resulting smiles again and check if the chirality tags are correct.
-        reac_smi3 = Chem.MolToSmiles(reac_mol, canonical=False)
-        prod_smi3 = Chem.MolToSmiles(prod_mol, canonical=False)
+        reac_smi3 = Chem.MolToSmiles(reac_mol, canonical=False, kekuleSmiles=kekulized)
+        prod_smi3 = Chem.MolToSmiles(prod_mol, canonical=False, kekuleSmiles=kekulized)
 
         reac_map_num_of_chiral_centers = get_chiral_center_map_nums(reac_mol)
         prod_map_num_of_chiral_centers = get_chiral_center_map_nums(prod_mol)

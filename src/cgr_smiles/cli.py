@@ -79,12 +79,7 @@ def main_rxn2cgr():
     parser.add_argument("--remove-hydrogens", action="store_true", help="Remove explicit hydrogens")
     parser.add_argument("--balance-rxn", action="store_true", help="Balance the given reaction")
     parser.add_argument("--product-based", action="store_true", help="Balance the given reaction")
-    parser.add_argument(
-        "--ignore-aromaticity",
-        action="store_false",
-        dest="use_aromaticity",
-        help="Ignore aromaticity perception during sanitization (default: use aromaticity)",
-    )
+    parser.add_argument("--kekulize", action="store_true", help="Use the SMILES kekule form")
     parser.add_argument(
         "--ignore-aromatic-bonds",
         action="store_false",
@@ -113,7 +108,7 @@ def main_rxn2cgr():
         remove_hydrogens=args.remove_hydrogens,
         balance_rxn=args.balance_rxn,
         rxn_col=args.rxn_col,
-        use_aromaticity=args.use_aromaticity,
+        kekulize=args.kekulize,
         keep_aromatic_bonds=args.keep_aromatic_bonds,
     )
 

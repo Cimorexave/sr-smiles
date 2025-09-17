@@ -117,23 +117,29 @@ class RxnToCgr:
     """Transform reaction SMILES into CGR SMILES.
 
     This class provides a callable interface to convert reaction SMILES into
-    CGR SMILES. It supports single strings, lists of strings, pandas Series,
-    and pandas DataFrames.
+    Condensed Graph of Reaction (CGR) SMILES. It supports single strings, lists
+    of strings, pandas Series, and pandas DataFrames.
+
+    The transformation can optionally adjust atom mappings, simplify SMILES
+    notation, remove explicit hydrogens, balance reactions, and control whether
+    aromatic systems are represented in Kekulé form.
 
     Attributes:
-        keep_atom_mapping (bool): Whether to preserve atom mapping in the output.
-        remove_brackets (bool): Whether to remove brackets from the SMILES.
-        remove_hydrogens (bool): Whether to remove explicit hydrogens.
-        balance_rxn (bool): Whether to balance the given reaction.
+        keep_atom_mapping (bool): Whether to preserve atom mapping numbers
+            in the output CGR SMILES.
+        remove_brackets (bool): Whether to remove redundant square brackets
+            from the SMILES.
+        remove_hydrogens (bool): Whether to remove explicit hydrogen atoms
+            from the SMILES.
+        balance_rxn (bool): Whether to attempt balancing of the reaction
+            stoichiometry before generating the CGR.
         rxn_col (Optional[str]): Column name in a DataFrame containing reaction SMILES.
-
-    Examples:
-        Transform a pandas DataFrame of reactions into CGR SMILES:
-
-        >>> import pandas as pd
-        >>> df = pd.read_csv("path/to/file.csv")
-        >>> transform = RxnToCgr(rxn_col="rxn_smiles")
-        >>> df["cgr_smiles"] = transform(df)
+        kekulize (bool): If True, converts aromatic atoms/bonds into an explicit
+            Kekulé representation. If False (default), aromatic notation is kept.
+        keep_aromatic_bonds (bool): Controls how aromaticity is handled when
+            `kekulize=True`. If True, aromatic bonds are explicitly flagged in
+            the Kekulé-expanded CGR. If False, aromaticity is fully expanded into
+            alternating single/double bonds. Has no effect if `kekulize=False`.
     """
 
     def __init__(
@@ -143,7 +149,7 @@ class RxnToCgr:
         remove_hydrogens: bool = False,
         balance_rxn: bool = False,
         rxn_col: Optional[str] = None,
-        use_aromaticity: bool = True,
+        kekulize: bool = False,
         keep_aromatic_bonds: bool = True,
     ) -> None:
         """Initialize the transformation object.
@@ -151,26 +157,29 @@ class RxnToCgr:
         Args:
             keep_atom_mapping (bool, optional): If True, preserve atom mapping
                 in the output. Defaults to False.
-            remove_brackets (bool, optional): If True, remove brackets from
-                the SMILES. Defaults to False.
-            remove_hydrogens (bool, optional): If True, remove explicit
-                hydrogens. Defaults to False.
+            remove_brackets (bool, optional): If True, remove square brackets
+                from the SMILES where possible. Defaults to False.
+            remove_hydrogens (bool, optional): If True, remove explicit hydrogens
+                from the SMILES. Defaults to False.
             balance_rxn (bool, optional): If True, attempts to balance the reaction
-                before generating the CGR. Defaults to False.
+                stoichiometry before generating the CGR. Defaults to False.
             rxn_col (str, optional): Column name in a DataFrame containing
                 reaction SMILES. Required if passing a DataFrame. Defaults to None.
-            use_aromaticity (bool, optional): If True, RDKit aromaticity perception is applied
-                during sanitization, and aromatic atoms will be written in lowercase (e.g. "c").
-                If False, aromaticity perception is skipped, and atoms will be written in
-                uppercase (e.g. "C"). Defaults to True.
-            keep_aromatic_bonds: TODO
+            kekulize (bool, optional): If True, converts all aromatic atoms/bonds into a
+                Kekulé form with explicit single/double bonds. Defaults to False
+                (keep aromatic SMILES notation).
+            keep_aromatic_bonds (bool, optional): Effective only when `kekulize=True`.
+                If True, aromatic bonds are explicitly retained in the Kekulé-expanded
+                CGR (where supported). If False, aromaticity is fully expressed as
+                alternating single/double bonds. Has no effect if `kekulize=False`.
+                Defaults to True.
         """
         self.keep_atom_mapping = keep_atom_mapping
         self.remove_brackets = remove_brackets
         self.remove_hydrogens = remove_hydrogens
         self.balance_rxn = balance_rxn
         self.rxn_col = rxn_col
-        self.use_aromaticity = use_aromaticity
+        self.kekulize = kekulize
         self.keep_aromatic_bonds = keep_aromatic_bonds
 
     def __call__(
@@ -198,7 +207,7 @@ class RxnToCgr:
                 remove_brackets=self.remove_brackets,
                 remove_hydrogens=self.remove_hydrogens,
                 balance_rxn=self.balance_rxn,
-                use_aromaticity=self.use_aromaticity,
+                kekulize=self.kekulize,
                 keep_aromatic_bonds=self.keep_aromatic_bonds,
             )
 
@@ -239,7 +248,7 @@ def rxn_to_cgr(
     remove_brackets: bool = False,
     remove_hydrogens: bool = False,
     balance_rxn: bool = False,
-    use_aromaticity: bool = True,
+    kekulize: bool = False,
     keep_aromatic_bonds: bool = True,
 ) -> str:
     """Converts a reaction SMILES string into a Condensed Graph of Reaction (CGR) SMILES.
@@ -258,11 +267,14 @@ def rxn_to_cgr(
             output CGR SMILES. Otherwise they will be kept (default).
         balance_rxn (bool, optional): If True, attempts to balance the reaction
             before generating the CGR. Defaults to False.
-        use_aromaticity (bool, optional): If True, RDKit aromaticity perception is applied
-            during sanitization, and aromatic atoms will be written in lowercase (e.g. "c").
-            If False, aromaticity perception is skipped, and atoms will be written in
-            uppercase (e.g. "C"). Defaults to True.
-        keep_aromatic_bonds: TODO
+        kekulize (bool, optional): If True, converts all aromatic atoms/bonds into a
+            specific Kekulé representation with alternating single/double bonds.
+            Defaults to False (keep aromatic notation).
+        keep_aromatic_bonds (bool, optional): If True and used together with
+            `kekulize=True`, aromatic bonds will be explicitly retained in the
+            Kekulé-expanded CGR (where supported). If False under `kekulize=True`,
+            aromaticity is fully converted into alternating single/double bonds.
+            Has no effect if `kekulize=False`. Defaults to True.
 
     Returns:
         str: A CGR SMILES string representing the reaction as a single molecule
@@ -287,7 +299,7 @@ def rxn_to_cgr(
     try:
         if not is_rxn_balanced(rxn_smi):
             if balance_rxn:
-                rxn_smi = balance_reaction(rxn_smi, use_aromaticity=use_aromaticity)
+                rxn_smi = balance_reaction(rxn_smi, kekulize=kekulize)
             else:
                 raise ValueError(
                     "The given rxn is not balanced. To enable cgr transform, set `balance_reaction=True`."
@@ -303,8 +315,8 @@ def rxn_to_cgr(
 
         smi_reac, _, smi_prod = rxn_smi.split(">")
         mol_reac, mol_prod = (
-            make_mol(smi_reac, use_aromaticity=use_aromaticity),
-            make_mol(smi_prod, use_aromaticity=use_aromaticity),
+            make_mol(smi_reac, kekulize=kekulize),
+            make_mol(smi_prod, kekulize=kekulize),
         )
 
         ri2pi = map_reac_to_prod(mol_reac, mol_prod)
@@ -323,7 +335,7 @@ def rxn_to_cgr(
 
         mol_cgr = mol_cgr.GetMol()
         smi_cgr = Chem.MolToSmiles(mol_cgr, canonical=False)
-        mol_cgr = make_mol(smi_cgr, sanitize=False, use_aromaticity=use_aromaticity)
+        mol_cgr = make_mol(smi_cgr, sanitize=False, kekulize=kekulize)
 
         # reorder reac and prod molecule so we get the relative stereochemistry tags right:
         # TODO: by doing the reordering, we basically canonicalize and make it a non-injective mapping
@@ -463,7 +475,7 @@ def rxn_to_cgr(
         elif remove_brackets:
             smi_cgr = remove_redundant_brackets(smi_cgr)
 
-        if not keep_aromatic_bonds:
+        if not kekulize and not keep_aromatic_bonds:
             smi_cgr = remove_aromatic_bonds(smi_cgr)
 
         return smi_cgr

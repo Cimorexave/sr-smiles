@@ -453,17 +453,15 @@ def includes_individually_mapped_hydrogens(smiles: str) -> bool:
         return res
 
 
-def make_mol(smi: str, sanitize: bool = True, use_aromaticity: bool = True) -> Chem.Mol:
+def make_mol(smi: str, sanitize: bool = True, kekulize: bool = True) -> Chem.Mol:
     """Creates an RDKit molecule object from a SMILES string, with optional sanitization.
 
     Args:
         smi (str): A SMILES string representing the molecule.
         sanitize (bool, optional): Whether to sanitize the molecule after parsing. Defaults to True.
             Sanitization applies all standard checks except hydrogen adjustment.
-        use_aromaticity (bool, optional): If True, RDKit aromaticity perception is applied
-            during sanitization, and aromatic atoms will be written in lowercase (e.g. "c").
-            If False, aromaticity perception is skipped, and atoms will be written in
-            uppercase (e.g. "C"). Defaults to True.
+        kekulize (bool, optional): If True, converts all aromatic atoms/bonds into a Kekulé form with
+            explicit single/double bonds. Defaults to False (keep aromatic SMILES notation).
 
     Returns:
         Chem.Mol: An RDKit molecule object constructed from the SMILES string.
@@ -479,7 +477,7 @@ def make_mol(smi: str, sanitize: bool = True, use_aromaticity: bool = True) -> C
     mol = Chem.MolFromSmiles(smi, sanitize=False)
     if sanitize:
         sanitize_flags = Chem.SanitizeFlags.SANITIZE_ALL ^ Chem.SanitizeFlags.SANITIZE_ADJUSTHS
-        if not use_aromaticity:
+        if kekulize:
             sanitize_flags ^= Chem.SanitizeFlags.SANITIZE_SETAROMATICITY
 
         Chem.SanitizeMol(mol, sanitizeOps=sanitize_flags)
