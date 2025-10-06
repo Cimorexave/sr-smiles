@@ -2,6 +2,7 @@ import csv
 
 import pandas as pd
 import pytest
+from conftest import equivalent_reactions
 
 from cgr_smiles.transforms.cgr_to_rxn import cgr_to_rxn
 from cgr_smiles.transforms.rxn_to_cgr import rxn_to_cgr
@@ -80,6 +81,7 @@ def test_roundtrip_per_sample(file_path, idx, rxn_smiles, rxn_col):
     """Test single sample roundtrip (RXN -> CGR -> RXN)."""
     rxn_can = canonicalize(rxn_smiles)
     cgr = rxn_to_cgr(rxn_smiles, keep_atom_mapping=True)
+
     res = cgr_to_rxn(cgr)
     res_can = canonicalize(res)
 
@@ -92,3 +94,17 @@ def test_roundtrip_per_sample(file_path, idx, rxn_smiles, rxn_col):
     assert (
         res_can == rxn_can
     ), f"Mismatch at {file_path}:{idx}, cgr={cgr}, rxn_can={rxn_can}, res_can={res_can}"
+
+
+@pytest.mark.e2e
+@pytest.mark.parametrize("file_path, idx, rxn_smiles, rxn_col", test_cases, ids=ids)
+def test_roundtrip_per_sample_with_unmapped_cgr_smiles(file_path, idx, rxn_smiles, rxn_col):
+    """Test single sample roundtrip (RXN -> CGR -> RXN)."""
+    rxn_can = canonicalize(rxn_smiles)
+    cgr = rxn_to_cgr(rxn_smiles, keep_atom_mapping=False)
+
+    res = cgr_to_rxn(cgr, add_atom_mapping=True)
+    res_can = canonicalize(res)
+
+    assert equivalent_reactions(rxn_smiles, res)
+    assert equivalent_reactions(rxn_can, res_can)

@@ -9,6 +9,7 @@ from cgr_smiles.utils import make_mol
 def augment_atom_traversal_order(
     rxn_smiles: str,
     random_state: Optional[random.Random] = None,
+    kekulize: bool = False,
 ) -> str:
     """Randomizes atom traversal order independently in both reactants and products of a reaction SMILES.
 
@@ -19,13 +20,14 @@ def augment_atom_traversal_order(
     Args:
         rxn_smiles (str): Reaction SMILES string.
         random_state (Optional[random.Random]): Optional random state for reproducibility.
+        kekulize (bool): defaults to False.
 
     Returns:
         str: Augmented reaction SMILES.
     """
     r, _, p = rxn_smiles.split(">")
-    mol_reac = make_mol(r)
-    mol_prod = make_mol(p)
+    mol_reac = make_mol(r, kekulize=kekulize)
+    mol_prod = make_mol(p, kekulize=kekulize)
 
     rng = random_state if random_state is not None else random.Random()
 

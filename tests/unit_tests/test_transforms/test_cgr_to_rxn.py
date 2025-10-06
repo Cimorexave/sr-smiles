@@ -42,8 +42,8 @@ CGR_TEST_CASES = list(zip(DF["rxn"], DF["rxn_smiles"], DF["cgr_smiles"]))
 
 
 @pytest.mark.parametrize("rxn_id, rxn_smiles, cgr_smiles", CGR_TEST_CASES)
-def test_cgr_to_rxn(rxn_id, rxn_smiles, cgr_smiles):
-    """Check that CGR to RXN conversion reproduces the original reaction SMILES."""
+def test_mapped_cgr_to_rxn(rxn_id, rxn_smiles, cgr_smiles):
+    """Check that CGR (with mapping!) to RXN conversion reproduces the original reaction SMILES."""
     res1 = cgr_to_rxn(cgr_smiles)
     rxn2 = canonicalize(rxn_smiles)
     res2 = canonicalize(res1)
@@ -51,11 +51,12 @@ def test_cgr_to_rxn(rxn_id, rxn_smiles, cgr_smiles):
 
 
 @pytest.mark.parametrize("rxn_id, rxn_smiles, cgr_smiles", CGR_TEST_CASES)
-def test_cgr_to_rxn2(rxn_id, rxn_smiles, cgr_smiles):
-    """Check that CGR to RXN conversion reproduces the original reaction SMILES."""
+def test_unmapped_cgr_to_rxn(rxn_id, rxn_smiles, cgr_smiles):
+    """Check that CGR (unmapped) to RXN conversion reproduces an equivalent to the original RXN SMILES."""
     cgr = rxn_to_cgr(rxn_smiles, remove_brackets=True, remove_hydrogens=True)
-    rxn = cgr_to_rxn(cgr, add_atom_mapping=True)
+    assert not is_cgr_smiles_fully_atom_mapped(cgr)
 
+    rxn = cgr_to_rxn(cgr, add_atom_mapping=True)
     assert equivalent_reactions(rxn_smiles, rxn)
 
 
