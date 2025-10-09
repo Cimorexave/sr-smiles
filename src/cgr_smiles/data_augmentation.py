@@ -17,6 +17,10 @@ def augment_atom_traversal_order(
     SMILES representations, which can improve model generalization in SMILES-based
     learning tasks.
 
+    Note:
+        RDKit's internal randomization (`doRandom=True`) is not reseeded between calls,
+        so repeated calls in the same session may yield different outputs.
+
     Args:
         rxn_smiles (str): Reaction SMILES string.
         random_state (Optional[random.Random]): Optional random state for reproducibility.
@@ -30,9 +34,11 @@ def augment_atom_traversal_order(
     mol_p = make_mol(p, kekulize=kekulize)
 
     # Pick a random atom map shared by both
-    shared_maps = list(
-        set(a.GetAtomMapNum() for a in mol_r.GetAtoms() if a.GetAtomMapNum() > 0)
-        & set(a.GetAtomMapNum() for a in mol_p.GetAtoms() if a.GetAtomMapNum() > 0)
+    shared_maps = (
+        list(  # TODO: get map nums from all fragments. Currently only the largest one is checked I believe
+            set(a.GetAtomMapNum() for a in mol_r.GetAtoms() if a.GetAtomMapNum() > 0)
+            & set(a.GetAtomMapNum() for a in mol_p.GetAtoms() if a.GetAtomMapNum() > 0)
+        )
     )
 
     if not shared_maps:
@@ -42,12 +48,12 @@ def augment_atom_traversal_order(
     root_map = rng.choice(shared_maps)
 
     # get the atom indices corresponding to that map on each side
-    root_r = next(a.GetIdx() for a in mol_r.GetAtoms() if a.GetAtomMapNum() == root_map)
-    root_p = next(a.GetIdx() for a in mol_p.GetAtoms() if a.GetAtomMapNum() == root_map)
+    root_idx_r = next(a.GetIdx() for a in mol_r.GetAtoms() if a.GetAtomMapNum() == root_map)
+    root_idx_p = next(a.GetIdx() for a in mol_p.GetAtoms() if a.GetAtomMapNum() == root_map)
 
-    # produce smiles rooted at those atoms
-    r_smi = Chem.MolToSmiles(mol_r, canonical=False, rootedAtAtom=root_r)
-    p_smi = Chem.MolToSmiles(mol_p, canonical=False, rootedAtAtom=root_p)
+    # produce smiles rooted at those atoms with random traversal
+    r_smi = Chem.MolToSmiles(mol_r, canonical=False, rootedAtAtom=root_idx_r, doRandom=True)
+    p_smi = Chem.MolToSmiles(mol_p, canonical=False, rootedAtAtom=root_idx_p, doRandom=True)
 
     return r_smi + ">>" + p_smi
 

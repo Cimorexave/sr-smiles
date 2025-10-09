@@ -585,6 +585,43 @@ def is_kekule(atom_mapped_rxn_smi: str) -> bool:
     return True
 
 
+def _rebuild_side_from_cgr(
+    side_smi: str,
+    scaffold: str,
+    cgr_side_name: str,
+    kekulized: bool,
+) -> str:
+    """Rebuild either reactant or product molecule from CGR scaffold."""
+    try:
+        parsed_bonds = parse_bonds_from_smiles(side_smi)
+
+        # which bonds to delete:
+        map_nums_unspecified_bonds = [key for key, val in parsed_bonds.items() if val == "~"]
+
+        # Build RDKit Mol
+        mol = Chem.MolFromSmiles(side_smi.replace("~", ""), sanitize=False)
+        Chem.SanitizeMol(mol, Chem.SanitizeFlags.SANITIZE_ADJUSTHS)
+
+        # Delete unspecified bonds
+        mol = remove_bonds_by_atom_map_nums(mol, map_nums_unspecified_bonds)
+
+        # Fix cis/trans stereo
+        mol = update_cis_trans_stereo_chem(mol, parsed_bonds)
+
+        # Convert back to SMILES
+        smi = Chem.MolToSmiles(mol, canonical=False, kekuleSmiles=kekulized)
+
+        # Fix chirality
+        chiral_map_nums = get_chiral_center_map_nums(mol)
+        smi = update_chirality_tags(smi, scaffold, chiral_map_nums)
+
+        return smi
+
+    except Exception as e:
+        logger.warning(f"Failed to process CGR-SMILES {cgr_side_name} side '{side_smi}'. Error: {e}")
+        return ""
+
+
 def cgr_to_rxn(cgr_smiles: str, add_atom_mapping: bool = False) -> str:
     """Converts a CGR SMILES string back into a reaction SMILES string.
 
@@ -613,7 +650,6 @@ def cgr_to_rxn(cgr_smiles: str, add_atom_mapping: bool = False) -> str:
         return ""
 
     try:
-        # TODO: start with a validity check, especially that each substitution pattern follows `{...|...}`.
         if not is_cgr_smiles_fully_atom_mapped(cgr_smiles):
             cgr_smi = add_atom_mapping_to_cgr(cgr_smiles)
             input_atom_mapped = False
@@ -624,45 +660,19 @@ def cgr_to_rxn(cgr_smiles: str, add_atom_mapping: bool = False) -> str:
         kekulized = is_kekule(cgr_smi)
 
         # extract reac and prod smiles scaffold from cgr smiles
-        reac_smi1, prod_smi1 = get_reac_prod_scaffold_smiles_from_cgr(cgr_smi)
+        reac_smi, prod_smi = get_reac_prod_scaffold_smiles_from_cgr(cgr_smi)
+        cgr_reac_scaffold = reac_smi.replace("~", "")
+        cgr_prod_scaffold = prod_smi.replace("~", "")
 
-        cgr_reac_scaffold = reac_smi1.replace("~", "")
-        cgr_prod_scaffold = prod_smi1.replace("~", "")
+        # try each side independently
+        reac_smi_final = _rebuild_side_from_cgr(reac_smi, cgr_reac_scaffold, "reactant", kekulized)
+        prod_smi_final = _rebuild_side_from_cgr(prod_smi, cgr_prod_scaffold, "product", kekulized)
 
-        # extract the bonds, parsed from the smiles
-        reac_parsed_bonds = parse_bonds_from_smiles(reac_smi1)
-        prod_parsed_bonds = parse_bonds_from_smiles(prod_smi1)
+        # If everything failed entirely, fall back
+        if reac_smi_final == "" and prod_smi_final == "":
+            return ""
 
-        # extract the bond information of the unspecified bonds (those we want to delete from the molecule)
-        reac_map_nums_unspecified_bonds = [key for key, val in reac_parsed_bonds.items() if val == "~"]
-        prod_map_nums_unspecified_bonds = [key for key, val in prod_parsed_bonds.items() if val == "~"]
-
-        # create the mols from the smiles and manually remove the bonds that are labelled as unspecified
-        reac_mol = Chem.MolFromSmiles(reac_smi1.replace("~", ""), sanitize=False)
-        prod_mol = Chem.MolFromSmiles(prod_smi1.replace("~", ""), sanitize=False)
-
-        Chem.SanitizeMol(prod_mol, Chem.SanitizeFlags.SANITIZE_ADJUSTHS)
-        Chem.SanitizeMol(reac_mol, Chem.SanitizeFlags.SANITIZE_ADJUSTHS)
-
-        # smiles based patch needed while bug not fixed on rdkits end.
-        reac_mol = remove_bonds_by_atom_map_nums(reac_mol, reac_map_nums_unspecified_bonds)
-        prod_mol = remove_bonds_by_atom_map_nums(prod_mol, prod_map_nums_unspecified_bonds)
-
-        # update stereochem bonds / and \ (because apparently they get messed up along the way. this might not be neccessary anymore if previous bug gets fixed.)  # noqa: E501
-        reac_mol = update_cis_trans_stereo_chem(reac_mol, reac_parsed_bonds)
-        prod_mol = update_cis_trans_stereo_chem(prod_mol, prod_parsed_bonds)
-
-        # then get the resulting smiles again and check if the chirality tags are correct.
-        reac_smi3 = Chem.MolToSmiles(reac_mol, canonical=False, kekuleSmiles=kekulized)
-        prod_smi3 = Chem.MolToSmiles(prod_mol, canonical=False, kekuleSmiles=kekulized)
-
-        reac_map_num_of_chiral_centers = get_chiral_center_map_nums(reac_mol)
-        prod_map_num_of_chiral_centers = get_chiral_center_map_nums(prod_mol)
-
-        reac_smi4 = update_chirality_tags(reac_smi3, cgr_reac_scaffold, reac_map_num_of_chiral_centers)
-        prod_smi4 = update_chirality_tags(prod_smi3, cgr_prod_scaffold, prod_map_num_of_chiral_centers)
-
-        rxn_smiles = f"{reac_smi4}>>{prod_smi4}"
+        rxn_smiles = f"{reac_smi_final}>>{prod_smi_final}"
 
         if not input_atom_mapped and not add_atom_mapping:
             rxn_smiles = remove_atom_mapping(rxn_smiles)
@@ -671,5 +681,7 @@ def cgr_to_rxn(cgr_smiles: str, add_atom_mapping: bool = False) -> str:
         return rxn_smiles
 
     except Exception as e:
-        logger.warning(f"Failed to process CGR-SMILES '{cgr_smiles}'. Error: {e}. Returning empty string.")
+        logger.warning(
+            f"Total failure in cgr_to_rxn for input '{cgr_smiles}'. " f"Error: {e}. Returning empty string."
+        )
         return ""
