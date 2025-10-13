@@ -200,7 +200,7 @@ DataFrame with CGR-SMILES:
 ```
 
 
-### 3. Command Line Interface
+### 3. Command Line Interface (`rxn2cgr` and `cgr2rxn`)
 
 If your prefer working with a CLI tool , that be it:
 
