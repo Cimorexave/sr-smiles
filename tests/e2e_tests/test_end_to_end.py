@@ -3,11 +3,12 @@ import csv
 import pandas as pd
 import pytest
 from conftest import equivalent_reactions
+from rdkit import Chem
 
 from cgr_smiles import ROOT_DIR
 from cgr_smiles.chem_utils.smiles_utils import canonicalize
-from cgr_smiles.transforms.cgr_to_rxn import cgr_to_rxn
-from cgr_smiles.transforms.rxn_to_cgr import rxn_to_cgr
+from cgr_smiles.transforms.cgr_to_rxn import CgrToRxn, cgr_to_rxn
+from cgr_smiles.transforms.rxn_to_cgr import RxnToCgr, rxn_to_cgr
 
 TEST_DATA_PATH = ROOT_DIR / "tests" / "data"
 
@@ -109,3 +110,59 @@ def test_roundtrip_per_sample_with_unmapped_cgr_smiles(file_path, idx, rxn_smile
 
     assert equivalent_reactions(rxn_smiles, res)
     assert equivalent_reactions(rxn_can, res_can)
+
+
+def canonicalize_without_mapping(smi: str) -> str:
+    """Remove atom mapping and return canonical (Kekulé) SMILES."""
+    mol = Chem.MolFromSmiles(smi)
+    if mol is None:
+        raise ValueError(f"Invalid SMILES: {smi}")
+
+    # Strip atom-map numbers
+    for atom in mol.GetAtoms():
+        atom.SetAtomMapNum(0)
+
+    # Canonicalize
+    return Chem.MolToSmiles(mol, canonical=True)
+
+
+def are_equivalent_rxn_smiles(smi1: str, smi2: str) -> bool:
+    """Return True if two SMILES encode the same structure, ignoring atom mapping."""
+    reac1, prod1 = smi1.split(">>")
+    can1_reac = canonicalize_without_mapping(reac1)
+    can1_prod = canonicalize_without_mapping(prod1)
+
+    reac2, prod2 = smi2.split(">>")
+    can2_reac = canonicalize_without_mapping(reac2)
+    can2_prod = canonicalize_without_mapping(prod2)
+
+    return can1_reac == can2_reac and can1_prod == can2_prod
+
+
+subset_test_cases, subset_ids = generate_individual_tests(max_samples=10)
+
+
+@pytest.fixture(scope="module")
+def transform_back():
+    """Single backward transformer instance (CGR → Rxn)."""
+    return CgrToRxn()
+
+
+@pytest.fixture(params=["rxn_mapper", "graph_overlay", None], ids=str)
+def forward_transformer(request):
+    """Forward RxnToCgr transformer, parameterized by mapping method."""
+    return RxnToCgr(mapping_method=request.param, keep_atom_mapping=True)
+
+
+@pytest.mark.parametrize("file_path, idx, rxn_smiles, rxn_col", subset_test_cases, ids=subset_ids)
+def test_RxnToCgr_roundtrip_with_mapping_method(
+    forward_transformer, transform_back, file_path, idx, rxn_smiles, rxn_col
+):
+    """Ensure round-trip Rxn → CGR → Rxn equivalence across mapping backends."""
+    cgr = forward_transformer(rxn_smiles)
+    rxn_back = transform_back(cgr)
+
+    assert are_equivalent_rxn_smiles(rxn_smiles, rxn_back), (
+        f"Round-trip mismatch for sample {file_path}:{idx} "
+        f"using {forward_transformer.mapping_method} backend"
+    )

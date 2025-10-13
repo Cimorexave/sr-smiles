@@ -99,12 +99,12 @@ def test_unmapped_cgr_to_rxn(rxn_id, rxn_smiles, cgr_smiles):
     ],
 )
 def test_add_atom_mapping_to_cgr(cgr, expected):
-    """Add atom mapping to a CGR SMILES."""
+    """Add atom mapping to a CGR-SMILES."""
     assert add_atom_mapping_to_cgr(cgr) == expected
 
 
 def test_cgr_to_rxn_invalid_smiles(propagated_logger, caplog):
-    """Verify that invalid CGR SMILES input logs a warning and returns an empty string."""
+    """Verify that invalid CGR-SMILES input logs a warning and returns an empty string."""
     bad_smi = "INVALID-CGR-SMILES"
 
     with caplog.at_level("WARNING", logger=propagated_logger.name):
@@ -115,7 +115,7 @@ def test_cgr_to_rxn_invalid_smiles(propagated_logger, caplog):
 
     record = caplog.records[0]
     assert record.levelname == "WARNING"
-    assert "Failed to process CGR SMILES" in record.message, record.message
+    assert "Failed to process CGR-SMILES" in record.message, record.message
     # assert "Returning empty string." in record.message
 
 
@@ -378,7 +378,7 @@ def test_get_chiral_center_map_nums_no_chirality():
 
 
 def test_CgrToRxn_single_string():
-    """Test CgrToRxn class for single CGR SMILES."""
+    """Test CgrToRxn class for single CGR-SMILES."""
     transform = CgrToRxn()
     cgr_smiles = DF.iloc[0]["cgr_smiles"]
     exp_output = DF.iloc[0]["rxn_smiles"]
@@ -389,7 +389,7 @@ def test_CgrToRxn_single_string():
 
 
 def test_CgrToRxn_list_of_strings():
-    """Test CgrToRxn class for a list of CGR SMILES."""
+    """Test CgrToRxn class for a list of CGR-SMILES."""
     transform = CgrToRxn()
     cgr_smiles = DF["cgr_smiles"].tolist()
     exp_output = DF["rxn_smiles"].tolist()
@@ -477,7 +477,7 @@ def test_CgrToRxn_empty_inputs(empty_input, expected_type):
     ],
 )
 def test_is_cgr_smiles_fully_atom_mapped(cgr_smiles, is_fully_mapped):
-    """Check if a CGR SMILES is fully atom-mapped."""
+    """Check if a CGR-SMILES is fully atom-mapped."""
     assert is_cgr_smiles_fully_atom_mapped(cgr_smiles) == is_fully_mapped
 
 
@@ -546,5 +546,5 @@ def test_is_rxn_smiles_kekule(smiles, kekule):
     ],
 )
 def test_is_cgr_smiles_kekule(smiles, kekule):
-    """Check if a given CGR SMILES is kekulized."""
+    """Check if a given CGR-SMILES is kekulized."""
     assert is_kekule(smiles) == kekule
