@@ -25,20 +25,20 @@ from cgr_smiles.io.logger import logger
 
 
 class CgrToRxn:
-    """Transform reaction SMILES into CGR SMILES.
+    """Transform reaction SMILES into CGR-SMILES.
 
-    This class provides a callable interface to convert CGR SMILES into reaction
+    This class provides a callable interface to convert CGR-SMILES into reaction
     SMILES. It supports single strings, lists of strings, pandas Series, and
     pandas DataFrames.
 
     Attributes:
-        cgr_col (Optional[str]): Column name in a DataFrame containing CGR SMILES.
+        cgr_col (Optional[str]): Column name in a DataFrame containing CGR-SMILES.
         add_atom_mapping (bool, optional): If True, ensures atom mappings are
             present in the output RXN SMILES. If False, atom mappings are stripped
             unless they were already present in the input. Default is False.
 
     Examples:
-        Transform a pandas DataFrame of reactions into CGR SMILES:
+        Transform a pandas DataFrame of reactions into CGR-SMILES:
 
         >>> import pandas as pd
         >>> df = pd.read_csv("path/to/file.csv")
@@ -58,15 +58,15 @@ class CgrToRxn:
     def __call__(
         self, data: Union[str, List[str], pd.Series, pd.DataFrame]
     ) -> Union[str, List[str], pd.Series, pd.DataFrame]:
-        """Apply the transformation to CGR SMILES.
+        """Apply the transformation to CGR-SMILES.
 
         Args:
             data (Union[str, List[str], pd.Series, pd.DataFrame]): Input data
-                containing CGR SMILES. Can be a single string, a list of strings,
+                containing CGR-SMILES. Can be a single string, a list of strings,
                 a pandas Series, or a pandas DataFrame.
 
         Returns:
-            Union[str, List[str], pd.Series, pd.DataFrame]: Transformed CGR SMILES
+            Union[str, List[str], pd.Series, pd.DataFrame]: Transformed CGR-SMILES
             in the same structure as the input.
 
         Raises:
@@ -97,7 +97,7 @@ class CgrToRxn:
 
 
 def cgr_to_rxn(cgr_smiles: str, add_atom_mapping: bool = False) -> str:
-    """Converts a CGR SMILES string back into a reaction SMILES string.
+    """Converts a CGR-SMILES string back into a reaction SMILES string.
 
     This function reverses a Condensed Graph of Reaction (CGR) SMILES representation
     into standard reaction SMILES (`reactants>>products`). It reconstructs reactant
@@ -105,7 +105,7 @@ def cgr_to_rxn(cgr_smiles: str, add_atom_mapping: bool = False) -> str:
     and restoring chirality tags based on the CGR annotations.
 
     Args:
-        cgr_smiles (str): A CGR SMILES string representing a reaction, where changes
+        cgr_smiles (str): A CGR-SMILES string representing a reaction, where changes
             between reactants and products are encoded using `{reac|prod}` syntax.
         add_atom_mapping (bool, optional): If True, ensures atom mappings are
             present in the output RXN SMILES. If False, atom mappings are stripped
@@ -115,7 +115,7 @@ def cgr_to_rxn(cgr_smiles: str, add_atom_mapping: bool = False) -> str:
         str: The corresponding reaction SMILES string in the format "reactants>>products".
 
     Notes:
-        - Each substitution pattern in the CGR SMILES should follow `{...|...}`.
+        - Each substitution pattern in the CGR-SMILES should follow `{...|...}`.
         - Unspecified bonds (labeled as "~") are removed in the resulting molecules.
         - This function is the reverse transformation of `rxn_to_cgr`.
     """
@@ -214,7 +214,7 @@ def _rebuild_side_from_cgr(
         return smi
 
     except Exception as e:
-        logger.warning(f"Failed to process CGR SMILES {cgr_side_name} side '{side_smi}'. Error: {e}")
+        logger.warning(f"Failed to process CGR-SMILES {cgr_side_name} side '{side_smi}'. Error: {e}")
         return ""
 
 
@@ -229,7 +229,7 @@ def update_chirality_tags(smiles: str, cgr_scaffold: str, chiral_center_map_nums
 
     Args:
         smiles (str): The input SMILES string of the molecule.
-        cgr_scaffold (List[int]): A reference CGR SMILES string containing correct chirality
+        cgr_scaffold (List[int]): A reference CGR-SMILES string containing correct chirality
             information for comparison.
         chiral_center_map_nums: List of the atom map numbers of the chiral centers.
 
@@ -322,15 +322,15 @@ def update_e_z_stereo_chem(mol: Chem.Mol, parsed_bonds: dict) -> Chem.Mol:
 
 
 def get_reac_prod_scaffold_smiles_from_cgr(cgr_smiles: str) -> Tuple[str, str]:
-    """Extracts the reactant and product scaffold SMILES from a CGR SMILES string.
+    """Extracts the reactant and product scaffold SMILES from a CGR-SMILES string.
 
-    The CGR SMILES encodes atom-level differences between reactants and products using
+    The CGR-SMILES encodes atom-level differences between reactants and products using
     substitution patterns in the form `{reactant|product}`.
     This function decodes those patterns by replacing each `{...|...}` block with the
     appropriate fragment in two parallel SMILES strings: one for the reactant, one for the product.
 
     Args:
-        cgr_smiles (str): A CGR SMILES string containing substitution patterns.
+        cgr_smiles (str): A CGR-SMILES string containing substitution patterns.
 
     Returns:
         Tuple[str, str]: A tuple containing the reactant SMILES and product SMILES

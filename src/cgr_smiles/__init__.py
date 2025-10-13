@@ -1,4 +1,4 @@
-"""CGR SMILES representation of chemical reactions."""
+"""CGR-SMILES representation of chemical reactions."""
 
 from pathlib import Path
 
