@@ -45,17 +45,17 @@ ORGANIC_SUBSET = {
 
 
 def remove_redundant_brackets_and_hydrogens(smi_cgr: str) -> str:
-    """Remove redundant square brackets and explicit hydrogens from a CGR SMILES string.
+    """Remove redundant square brackets and explicit hydrogens from a CGR-SMILES string.
 
-    This function cleans a CGR SMILES string by removing brackets that contain only atoms
+    This function cleans a CGR-SMILES string by removing brackets that contain only atoms
     from the `ORGANIC_SUBSET` and by eliminating explicit hydrogen atoms where possible,
     while preserving charges, isotopes, and other annotations.
 
     Args:
-        smi_cgr (str): A CGR SMILES string potentially containing redundant brackets or hydrogens.
+        smi_cgr (str): A CGR-SMILES string potentially containing redundant brackets or hydrogens.
 
     Returns:
-        str: The cleaned CGR SMILES string with redundant brackets and hydrogens removed.
+        str: The cleaned CGR-SMILES string with redundant brackets and hydrogens removed.
     """
     # Special explicit-H patterns first
     specials = {
@@ -94,16 +94,16 @@ def remove_redundant_brackets_and_hydrogens(smi_cgr: str) -> str:
 
 
 def remove_redundant_brackets(smi_cgr: str) -> str:
-    """Removes redundant square brackets from a CGR SMILES string.
+    """Removes redundant square brackets from a CGR-SMILES string.
 
     Brackets are removed only if they enclose atoms from the `ORGANIC_SUBSET`. Brackets
     that include explicit hydrogens, charges, isotopes, or other annotations are preserved.
 
     Args:
-        smi_cgr (str): A CGR SMILES string potentially containing redundant brackets.
+        smi_cgr (str): A CGR-SMILES string potentially containing redundant brackets.
 
     Returns:
-        str: CGR SMILES string with redundant brackets removed.
+        str: CGR-SMILES string with redundant brackets removed.
     """
 
     def _replace_bracketed(match: Match[str]) -> str:
@@ -122,31 +122,47 @@ def remove_redundant_brackets(smi_cgr: str) -> str:
 
 
 def remove_aromatic_bonds(smiles: str) -> str:
-    """Removes aromatic bond symbols ':' outside brackets in a CGR SMILES string.
+    """Remove aromatic bond symbols (':') outside brackets and CGR bond blocks.
 
-    The colon (':') denotes aromatic bonds in SMILES but is also used inside
-    atom brackets to mark atom map numbers (e.g., `[C:1]`). This function
-    removes colons that represent aromatic bonds while preserving those used
-    within brackets for atom mapping.
+    Handles plain molecular SMILES, reaction SMILES, and CGR-SMILES strings.
+    The colon (`:`) denotes aromatic bonds in SMILES but also appears
+    *inside* brackets (for atom maps, e.g. `[C:1]`) and inside curly braces
+    for CGR bond descriptors (e.g. `{:|=}`). This function removes only those
+    colons that represent aromatic bonds **between atoms**, not those used
+    within `[...]` or `{...}` groups.
 
     Args:
-        smiles (str): SMILES string that may contain ':' characters.
+        smiles (str): A SMILES, reaction SMILES, or CGR-SMILES string that may
+            contain colon (':') characters.
 
     Returns:
-        str: The input SMILES with ':' bond descriptors removed but atom map
-        colons preserved.
+        str: The same SMILES string with aromatic bond colons removed, while
+        preserving colons inside atom brackets and CGR bond descriptors.
+
+    Example:
+        >>> remove_aromatic_bonds("c1:c:c:c:c:c:1")
+        'c1ccccc1'
+        >>> remove_aromatic_bonds("[c:1]:[c:2]>>[C:1][C:2]")
+        '[c:1][c:2]>>[C:1][C:2]'
+        >>> remove_aromatic_bonds("c:c{:|=}{c|C}")
+        'cc{:|=}{c|C}'
     """
     result = []
-    in_brackets = False
+    in_brackets = False  # inside [ ... ]
+    in_cgr_brackets = False  # inside { ... }
 
     for char in smiles:
         if char == "[":
             in_brackets = True
         elif char == "]":
             in_brackets = False
+        elif char == "{":
+            in_cgr_brackets = True
+        elif char == "}":
+            in_cgr_brackets = False
 
-        # skip ':' when outside brackets (bond), else keep (atom mapping)
-        if char == ":" and not in_brackets:
+        # Skip ':' when it's an aromatic bond (outside both brackets & braces)
+        if char == ":" and not in_brackets and not in_cgr_brackets:
             continue
 
         result.append(char)
@@ -277,7 +293,7 @@ def parse_bonds_in_order_from_smiles(smiles: str) -> Dict[Tuple[int, int], str]:
             Tuples to their bond specifier string.
 
     Raises:
-        ValueError: If the CGR SMILES string has malformed syntax.
+        ValueError: If the CGR-SMILES string has malformed syntax.
     """
     replace_dict_bonds = {}
     anchor_logical_idx = None
