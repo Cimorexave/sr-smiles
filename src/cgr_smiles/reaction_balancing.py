@@ -22,14 +22,19 @@ def get_element_counts(smiles: str) -> Counter:
     Raises:
         ValueError: If the SMILES string is invalid.
     """
-    mol = Chem.MolFromSmiles(smiles)
+    mol = make_mol(smiles)
     if mol is None:
         raise ValueError(f"Invalid SMILES: {smiles}")
-    mol = Chem.AddHs(mol)
-    counts = Counter()
-    for atom in mol.GetAtoms():
-        counts[atom.GetSymbol()] += 1
-    return counts
+    return Counter(atom.GetSymbol() for atom in mol.GetAtoms())
+
+    # mol = Chem.MolFromSmiles(smiles)
+    # if mol is None:
+    #     raise ValueError(f"Invalid SMILES: {smiles}")
+    # mol = Chem.AddHs(mol)
+    # counts = Counter()
+    # for atom in mol.GetAtoms():
+    #     counts[atom.GetSymbol()] += 1
+    # return counts
 
 
 def is_balanced(rxn_smi: str) -> str:
