@@ -208,7 +208,7 @@ If your prefer working with a CLI tool , that be it:
 ╭────────── 🚀 CGR‑SMILES Converter v0.0.1 ─────────╮
 │                                                   │
 │   👋 Welcome to CGR‑SMILES                        │
-│   Transforming Reaction SMILES ➡️ CGR‑SMILES       │
+│   Transforming Reaction SMILES ➡️ CGR‑SMILES      │
 │                                                   │
 │   Input column:   'rxn_smiles'                    │
 │   Output column:  'cgr_smiles'                    │
