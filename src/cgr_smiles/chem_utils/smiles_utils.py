@@ -436,7 +436,7 @@ def extract_chiral_tag_by_atom_map_num(smiles: str, atom_map_num: int) -> str:
     return ""
 
 
-def get_fragment_permutations(smiles: str) -> List[List[int]]:
+def get_fragment_permutations(smiles: str, max_permutations: int = None) -> List[List[int]]:
     """Generates all index permutations for disconnected fragments in a SMILES string.
 
     The SMILES string is split on '.' (dot), which separates disconnected
@@ -445,6 +445,8 @@ def get_fragment_permutations(smiles: str) -> List[List[int]]:
     Args:
         smiles (str): Input SMILES string, potentially containing multiple
             disconnected components, e.g. "CC.O.N".
+        max_permutations (int, optional): Maximum number of permutations to
+            generate. If None, all possible permutations are returned.
 
     Returns:
         List[List[int]]: A list of index permutations, where each sublist
@@ -453,11 +455,23 @@ def get_fragment_permutations(smiles: str) -> List[List[int]]:
     Example:
         >>> get_fragment_permutations("A.B.C")
         [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]]
+
+        >>> get_fragment_permutations("A.B.C", max_permutations=3)
+        [[0, 1, 2], [0, 2, 1], [1, 0, 2]]
     """
-    n_frag = len(smiles.split("."))
+    fragments = smiles.split(".")
+    n_frag = len(fragments)
+
     if n_frag <= 1:
         return [[0]]
-    return [list(p) for p in itertools.permutations(range(n_frag))]
+
+    result = []
+    for i, perm in enumerate(itertools.permutations(range(n_frag))):
+        if max_permutations is not None and i >= max_permutations:
+            break
+        result.append(list(perm))
+
+    return result
 
 
 def get_list_of_atom_map_numbers(smi: str) -> List[str]:

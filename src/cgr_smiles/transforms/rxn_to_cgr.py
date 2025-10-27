@@ -314,7 +314,7 @@ def get_cgr_scaffold(mol_reac: Chem.Mol, mol_prod: Chem.Mol, kekulize: bool) -> 
 
 
 def get_chirality_aligned_smiles_and_mols(
-    rxn_smi: str, kekulize: bool
+    rxn_smi: str, kekulize: bool, max_permutations: int = 5
 ) -> Tuple[str, str, Chem.Mol, Chem.Mol, Chem.Mol]:
     """Build reactant, product, and CGR molecules from a reaction SMILES.
 
@@ -337,6 +337,8 @@ def get_chirality_aligned_smiles_and_mols(
     Args:
         rxn_smi (str): Reaction SMILES string with atom mappings.
         kekulize (bool): Whether to kekulize molecules when creating them.
+        max_permutations (int, optional): Maximum number of fragment
+            permutations to test for chirality alignment. Defaults to 3.
 
     Returns:
         Tuple[str, str, str, str, Chem.Mol, Chem.Mol, Chem.Mol]:
@@ -347,7 +349,7 @@ def get_chirality_aligned_smiles_and_mols(
                 * **mol_prod** (`Chem.Mol`): Product molecule.
                 * **mol_cgr** (`Chem.Mol`): CGR molecule.
     """
-    frag_permutations = get_fragment_permutations(rxn_smi.split(">")[0])
+    frag_permutations = get_fragment_permutations(rxn_smi.split(">>")[0], max_permutations)
 
     while frag_permutations:
         smi_reac, _, smi_prod = rxn_smi.split(">")
@@ -385,6 +387,9 @@ def get_chirality_aligned_smiles_and_mols(
                             smi_reac = ".".join(frag_reac[i] for i in frag_permutations[0])
                             rxn_smi = f"{smi_reac}>>{smi_prod}"
                             break
+            else:
+                # only runs if the for-loop wasn't broken
+                break
         else:
             frag_permutations.pop(0)
 
