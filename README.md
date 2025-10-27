@@ -1,5 +1,5 @@
 
-<!-- Adjust when put on github and pypi -->
+<!-- TODO: Adjust when put on github and pypi -->
 
 <!-- <div align="center">
 
@@ -20,6 +20,8 @@
 Note: This repository is not yet public and not yet on PyPI, hence the installation is not yet possible via pip. [WIP]
 
 # CGR-SMILES
+
+<!-- TODO: Add a banner -->
 
 **CGR-SMILES** is a Python library for transforming reaction SMILES into a more compact and change-aware representation called **CGR-SMILES**. This representation explicitly encodes changes in chemical reactions, making it suitable for machine learning and data-driven applications.
 
@@ -53,6 +55,8 @@ Let's take a look at an example:
 👉 Notice how the CGR‑SMILES is more compact and explicitly encodes where atoms and bonds change during the reaction.
 
 ---
+
+<!-- TODO: Add dependencies section -->
 
 ## Installation
 
