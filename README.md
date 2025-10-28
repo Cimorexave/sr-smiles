@@ -19,11 +19,11 @@
 
 Note: This repository is not yet public and not yet on PyPI, hence the installation is not yet possible via pip. [WIP]
 
-# SR-SMILES
+# Superimposed Reaction (SR) SMILES
 
 <!-- TODO: Add a banner -->
 
-**SR-SMILES** is a Python library for transforming reaction SMILES into a more compact and change-aware representation called **Superimposed Reaction(SR) SMILES**. This representation explicitly encodes changes in chemical reactions, making it suitable for machine learning and data-driven applications.
+**SR-SMILES** is a Python library for transforming reaction SMILES into a more compact and change-aware representation called **Superimposed Reaction (SR) SMILES**. This representation explicitly encodes changes in chemical reactions, making it suitable for machine learning and data-driven applications.
 
 
 ---
