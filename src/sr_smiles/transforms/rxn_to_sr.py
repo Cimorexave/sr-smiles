@@ -38,7 +38,7 @@ class RxnToSr:
     """Transform reaction SMILES into sr-SMILES.
 
     This class provides a callable interface for converting reaction SMILES into
-    Superimposed Reaction (sr) SMILES. It supports single strings, lists
+    superimposed reaction (sr) SMILES. It supports single strings, lists
     of strings, pandas Series, and pandas DataFrames.
 
     Transformation options include atom mapping preservation, bracket and
@@ -76,7 +76,7 @@ class RxnToSr:
         keep_aromatic_bonds: bool = True,
         use_rxnmapper: bool = False,
     ) -> None:
-        """Initializes the RXN to SR transformation settings."""
+        """Initializes the RXN to sr transformation settings."""
         self.keep_atom_mapping = keep_atom_mapping
         self.remove_hydrogens = remove_hydrogens
         self.balance_rxn = balance_rxn
@@ -94,9 +94,6 @@ class RxnToSr:
 
         If True, uses the external RxnMapper package for atom mapping.
         If False, returns input reactions unchanged (identity mapping).
-
-        Raises:
-            ImportError: If ``use_rxnmapper=True`` but the **rxnmapper** package is not installed.
         """
         if self.use_rxnmapper:
             try:
@@ -141,7 +138,7 @@ class RxnToSr:
             n_empty = sum(item == "" for item in result)
             if result and n_empty:
                 logger.warning(
-                    f"SR transform failed for {n_empty}/{n_res} samples ({n_empty / n_res * 100:.1f}%)."
+                    f"sr transform failed for {n_empty}/{n_res} samples ({n_empty / n_res * 100:.1f}%)."
                 )
             return result
 
@@ -161,11 +158,6 @@ class RxnToSr:
             raise TypeError("Input must be str, list, pandas Series, or DataFrame.")
 
 
-# TODO: do some checks according to our assumptions (atom mapping, balanced etc)
-# TODO: standardize atom order depending on unmapped reactants, then add mappings again. Make the sr molecule from this canonicalized reactant molecule to get maximum reproducibility  # noqa: E501
-# TODO: Make this also work for unbalanced rxns
-
-
 def rxn_to_sr(
     rxn_smi: str,
     keep_atom_mapping: bool = False,
@@ -174,7 +166,7 @@ def rxn_to_sr(
     kekulize: bool = False,
     keep_aromatic_bonds: bool = False,
 ) -> str:
-    """Converts a reaction SMILES string into a Superimposed Reaction (sr) SMILES.
+    """Converts a reaction SMILES string into a superimposed reaction (sr) SMILES.
 
     An sr-SMILES encodes the transformation between reactant and product molecules
     as a single, compact string representation, where atoms and bonds are annotated to
@@ -221,22 +213,20 @@ def rxn_to_sr(
         # formed between them in the product molecule.
     """
     try:
-        # check if rxn_smi is balanced
+        # check if given rxn smiles is balanced
         if not is_balanced(rxn_smi):
             if balance_rxn:
                 rxn_smi = balance_reaction(rxn_smi, kekulize=kekulize)
             else:
                 raise ValueError(
                     "The given rxn is not balanced. "
-                    "Set `balance_rxn=True` to apply automatic balancing before SR transformation"
+                    "Set `balance_rxn=True` to apply automatic balancing before sr transformation"
                 )
 
         # detect if hydrogens are individually mapped (e.g., [H:1]) or implicit (e.g., [CH3])
-        if remove_hydrogens:
-            has_explicit_h = has_individually_mapped_hydrogens(rxn_smi)
-        else:
-            False
+        has_explicit_h = has_individually_mapped_hydrogens(rxn_smi) if remove_hydrogens else False
 
+        # start rxn to sr transformation
         rxn_smi, smi_sr_scaffold, mol_reac, mol_prod, mol_sr = get_chirality_aligned_smiles_and_mols(
             rxn_smi, kekulize
         )
@@ -244,9 +234,7 @@ def rxn_to_sr(
         replace_dict_atoms, replace_dict_bonds = extract_atom_and_bond_changes(mol_reac, mol_prod, mol_sr)
         smi_sr = build_sr_smiles(smi_sr_scaffold, replace_dict_atoms, replace_dict_bonds)
 
-        # Remove hydrogens based on detected representation
         if remove_hydrogens and has_explicit_h:
-            # Remove explicit hydrogens that are not involved in any changes
             unchanged_h_map_nums = get_unchanged_explicit_hydrogen_map_nums(
                 mol_reac, replace_dict_atoms, replace_dict_bonds
             )
@@ -255,12 +243,10 @@ def rxn_to_sr(
         if not keep_atom_mapping:
             smi_sr = remove_atom_mapping(smi_sr)
 
-        # Always remove redundant brackets; also remove implicit H if requested
+        # remove redundant brackets
         if remove_hydrogens and not has_explicit_h:
-            # Remove implicit hydrogens (e.g., [CH3] -> C) and redundant brackets
             smi_sr = remove_redundant_brackets_and_hydrogens(smi_sr)
         else:
-            # Just remove redundant brackets (e.g., [C] -> C)
             smi_sr = remove_redundant_brackets(smi_sr)
 
         if not kekulize and not keep_aromatic_bonds:
@@ -270,13 +256,13 @@ def rxn_to_sr(
 
     except Exception as e:
         logger.warning(
-            f"Failed to process RXN-SMILES '{rxn_smi}'.\n" f"Error: {e}.\n" "Returning empty string."
+            f"Failed to process RXN SMILES '{rxn_smi}'.\n" f"Error: {e}.\n" "Returning empty string."
         )
         return ""
 
 
 def get_sr_scaffold(mol_reac: Chem.Mol, mol_prod: Chem.Mol, kekulize: bool) -> Chem.Mol:
-    """Builds an SR scaffold molecule from aligned reactant and product RDKit molecules.
+    """Builds an sr scaffold molecule from aligned reactant and product RDKit molecules.
 
     Combines the reactant and product molecules into a superimposed reaction scaffold
     by merging both bond sets according to atom map correspondence. Any bonds
@@ -382,9 +368,6 @@ def get_chirality_aligned_smiles_and_mols(
                         nbrs_prod = adj_prod[map_num]
 
                         nbrs_reac, nbrs_prod = mask_nonshared_with_neg1(nbrs_reac, nbrs_prod)
-                        # check if a neighbor changed  # TODO: why?
-                        # if -1 not in nbrs_reac and -1 not in nbrs_prod:
-                        #     continue
 
                         if not is_num_permutations_even(nbrs_reac, nbrs_prod):
                             frag_reac = smi_reac.split(".")
@@ -392,7 +375,6 @@ def get_chirality_aligned_smiles_and_mols(
                             rxn_smi = f"{smi_reac}>>{smi_prod}"
                             break
             else:
-                # only runs if the for-loop wasn't broken
                 break
         else:
             frag_permutations.pop(0)
@@ -415,7 +397,6 @@ def add_radical_sign(smarts_string: str, n_radicals: int) -> str:
     carets = "^" if n_radicals == 1 else "^^"
 
     if smarts_string.endswith("]"):
-        # Insert carets before the closing bracket
         return f"{smarts_string[:-1]}{carets}]"
     else:
         return f"{smarts_string}{carets}"

@@ -123,7 +123,8 @@ def sr_to_rxn(sr_smiles: str, add_atom_mapping: bool = False) -> str:
         return ""
 
     try:
-        sr_smiles = sr_smiles.replace("^", "")
+        sr_smiles = remove_radical_annotations(sr_smiles)
+
         if not is_sr_smiles_fully_atom_mapped(sr_smiles):
             sr_smi = add_atom_mapping_to_sr(sr_smiles)
             input_atom_mapped = False
@@ -156,9 +157,14 @@ def sr_to_rxn(sr_smiles: str, add_atom_mapping: bool = False) -> str:
 
     except Exception as e:
         logger.warning(
-            f"Failure in sr_to_rxn for input '{sr_smiles}'. " f"Error: {e}. Returning empty string."
+            f"Failure in `sr_to_rxn()` for input '{sr_smiles}'. " f"Error: {e}. Returning empty string."
         )
         return ""
+
+
+def remove_radical_annotations(rxn_smi: str) -> str:
+    """Removes radical signs ('^') from a reaction SMILES string."""
+    return rxn_smi.replace("^", "")
 
 
 def _rebuild_side_from_sr(
@@ -195,17 +201,13 @@ def _rebuild_side_from_sr(
         # extract unspecified bonds to be deleted
         map_nums_unspecified_bonds = [key for key, val in parsed_bonds.items() if val == "~"]
 
-        # duild rdkit mol
+        # build rdkit mol
         mol = Chem.MolFromSmiles(side_smi.replace("~", ""), sanitize=False)
         Chem.SanitizeMol(mol, Chem.SanitizeFlags.SANITIZE_ADJUSTHS)
-
-        # delete unspecified bonds
         mol = remove_bonds_by_atom_map_nums(mol, map_nums_unspecified_bonds)
 
         # fix E/Z stereo
         mol = update_e_z_stereo_chem(mol, parsed_bonds)
-
-        # convert back to SMILES
         smi = Chem.MolToSmiles(mol, canonical=False, kekuleSmiles=kekulized)
 
         # fix chirality
