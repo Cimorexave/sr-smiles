@@ -401,6 +401,24 @@ def get_chirality_aligned_smiles_and_mols(
     return rxn_smi, smi_sr, mol_reac, mol_prod, mol_sr
 
 
+def add_radical_sign(smarts_string: str, n_radicals: int) -> str:
+    """Adds caret(s) '^' to a SMARTS string based on the number of radical electrons.
+
+    One '^' for 1 radical, '^^' for 2 or more radicals.
+    If the string is in square brackets, inserts inside: [C] -> [C^]
+    """
+    if n_radicals == 0:
+        return smarts_string
+
+    carets = "^" if n_radicals == 1 else "^^"
+
+    if smarts_string.endswith("]"):
+        # Insert carets before the closing bracket
+        return f"{smarts_string[:-1]}{carets}]"
+    else:
+        return f"{smarts_string}{carets}"
+
+
 def extract_atom_and_bond_changes(
     mol_reac: Chem.Mol, mol_prod: Chem.Mol, mol_sr: Chem.Mol
 ) -> tuple[dict[int, str], dict[tuple[int, int], str]]:
@@ -430,6 +448,12 @@ def extract_atom_and_bond_changes(
 
         reac_smarts = atom_reac.GetSmarts(isomericSmiles=True)
         prod_smarts = atom_prod.GetSmarts(isomericSmiles=True)
+
+        if atom_reac.GetNumRadicalElectrons() > 0:
+            reac_smarts = add_radical_sign(reac_smarts, n_radicals=atom_reac.GetNumRadicalElectrons())
+
+        if atom_prod.GetNumRadicalElectrons() > 0:
+            prod_smarts = add_radical_sign(prod_smarts, n_radicals=atom_prod.GetNumRadicalElectrons())
 
         if reac_smarts != prod_smarts:
             replace_dict_atoms[atom_sr.GetAtomMapNum()] = f"{{{reac_smarts}|{prod_smarts}}}"

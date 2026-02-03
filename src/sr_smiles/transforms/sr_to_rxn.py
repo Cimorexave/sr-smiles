@@ -123,6 +123,7 @@ def sr_to_rxn(sr_smiles: str, add_atom_mapping: bool = False) -> str:
         return ""
 
     try:
+        sr_smiles = sr_smiles.replace("^", "")
         if not is_sr_smiles_fully_atom_mapped(sr_smiles):
             sr_smi = add_atom_mapping_to_sr(sr_smiles)
             input_atom_mapped = False
