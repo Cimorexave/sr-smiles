@@ -175,7 +175,7 @@ RXNs:
 	[O:1]([C@@:2]([C:3](=[O:4])[H:5])([C:6]#[C:7][H:8])[H:9])[H:10]>>[O:1]([C@@:2]([C:3][O:4][H:5])([C:6]#[C:7][H:8])[H:9])[H:10]
 ```
 
-What if your reactions aren’t atom‑mapped, and/or some are unbalanced? No problem, simply set `balance_rxn=True` and/or enable the integrated mapper with `mapping_method="rxn_mapper"`.
+What if your reactions aren’t atom‑mapped, and/or some are unbalanced? No problem, simply set `balance_rxn=True` and/or enable the integrated mapper with `use_rxnmapper=True`.
 ```python
 # Example list of reactions
 rxn_list = [
@@ -188,7 +188,7 @@ rxn_list = [
 df_data = pd.DataFrame({"reaction": rxn_list})
 transform_to_sr_df = RxnToSr(
     rxn_col="reaction",
-    mapping_method="rxn_mapper",
+    use_rxnmapper=True,
     balance_rxn=True,
 )
 df_data["sr_smiles"] = transform_to_sr_df(df_data)

@@ -1,10 +1,10 @@
 import re
-from typing import Dict, List, Literal, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import pandas as pd
 from rdkit import Chem
 
-from sr_smiles.atom_mapping import GraphOverlayWrapper, IdentityMapper, RxnMapperWrapper
+from sr_smiles.atom_mapping import IdentityMapper, RxnMapperWrapper
 from sr_smiles.chem_utils.list_utils import is_num_permutations_even, mask_nonshared_with_neg1
 from sr_smiles.chem_utils.mol_utils import (
     get_atom_by_map_num,
@@ -17,8 +17,11 @@ from sr_smiles.chem_utils.smiles_utils import (
     _tokenize,
     get_atom_map_adjacency_list_from_smiles,
     get_fragment_permutations,
+    get_unchanged_explicit_hydrogen_map_nums,
+    has_individually_mapped_hydrogens,
     remove_aromatic_bonds,
     remove_atom_mapping,
+    remove_explicit_hydrogens_from_sr_smiles,
     remove_redundant_brackets,
     remove_redundant_brackets_and_hydrogens,
 )
@@ -43,8 +46,11 @@ class RxnToSr:
 
     Attributes:
         keep_atom_mapping (bool): Preserve atom mapping numbers in the output.
-        remove_brackets (bool): Remove redundant square brackets from SMILES.
-        remove_hydrogens (bool): Remove explicit hydrogen atoms.
+        remove_hydrogens (bool): Remove hydrogens from the output SR-SMILES.
+            Automatically detects the hydrogen representation in the input:
+            - If hydrogens are individually mapped (e.g., [H:1]), removes unchanged
+              explicit hydrogens (those not involved in bond/charge/radical changes).
+            - If hydrogens are implicit (e.g., [CH3]), simplifies to bare atoms (C).
         balance_rxn (bool): Attempt to balance the reaction stoichiometry before
             SR generation.
         rxn_col (Optional[str]): Column name in a DataFrame containing reaction SMILES.
@@ -55,67 +61,51 @@ class RxnToSr:
             Kekulé-expanded SR (where supported). If False under `kekulize=False`,
             aromaticity is fully converted into alternating single/double bonds.
             Has no effect if `kekulize=True`. Defaults to True.
+        use_rxnmapper (bool): If True, use RXNMapper for atom mapping before
+            SR transformation. Requires the rxnmapper package to be installed.
+            Defaults to False.
     """
 
     def __init__(
         self,
         keep_atom_mapping: bool = False,
-        remove_brackets: bool = False,
         remove_hydrogens: bool = False,
         balance_rxn: bool = False,
         rxn_col: Optional[str] = None,
         kekulize: bool = False,
         keep_aromatic_bonds: bool = True,
-        mapping_method: Literal["rxn_mapper", "graph_overlay"] = None,
+        use_rxnmapper: bool = False,
     ) -> None:
         """Initializes the RXN to SR transformation settings."""
         self.keep_atom_mapping = keep_atom_mapping
-        self.remove_brackets = remove_brackets
         self.remove_hydrogens = remove_hydrogens
         self.balance_rxn = balance_rxn
         self.rxn_col = rxn_col
         self.kekulize = kekulize
         self.keep_aromatic_bonds = keep_aromatic_bonds
-        self.mapping_method = mapping_method
+        self.use_rxnmapper = use_rxnmapper
         self.init_mapper()
 
     def init_mapper(self) -> None:
-        """Initialize the appropriate reaction mapper.
+        """Initialize the reaction mapper.
 
-        Creates and assigns a mapper instance to ``self.rxn_mapper`` based on
-        the selected mapping method stored in ``self.mapping_method``.
+        Creates and assigns a mapper instance to ``self.rxnmapper`` based on
+        ``self.use_rxnmapper``.
 
-        Supported methods:
-        * **"rxn_mapper"**: uses the external **RxnMapper** package.
-        * **"graph_overlay"**: uses the internal **GraphOverlayWrapper**.
-        * **"identity"**: applies no mapping and returns input reactions unchanged.
-
-        Args:
-            self: The class instance containing the ``mapping_method`` attribute.
+        If True, uses the external RxnMapper package for atom mapping.
+        If False, returns input reactions unchanged (identity mapping).
 
         Raises:
-            ValueError: If ``self.mapping_method`` is not one of the supported options.
-            ImportError: If ``"rxn_mapper"`` is selected but the **rxnmapper**
-                package is not installed.
+            ImportError: If ``use_rxnmapper=True`` but the **rxnmapper** package is not installed.
         """
-        valid_methods = {"rxn_mapper", "graph_overlay", None}
-        if self.mapping_method not in valid_methods:
-            raise ValueError(
-                f"Unsupported mapping method '{self.mapping_method}'. "
-                f"Choose from {sorted(valid_methods)}."
-            )
-
-        if self.mapping_method == "rxn_mapper":
+        if self.use_rxnmapper:
             try:
-                self.rxn_mapper = RxnMapperWrapper()
+                self.rxnmapper = RxnMapperWrapper()
             except ImportError:
                 raise ImportError("RxnMapper is not installed. Run: pip install rxnmapper")
 
-        elif self.mapping_method == "graph_overlay":
-            self.rxn_mapper = GraphOverlayWrapper()
-
         else:
-            self.rxn_mapper = IdentityMapper()
+            self.rxnmapper = IdentityMapper()
 
     def __call__(
         self, data: Union[str, List[str], pd.Series, pd.DataFrame]
@@ -135,11 +125,10 @@ class RxnToSr:
             TypeError: If the input type is not supported.
         """
         if isinstance(data, str):
-            mapped_rxn = self.rxn_mapper(data)
+            mapped_rxn = self.rxnmapper(data)
             return rxn_to_sr(
                 mapped_rxn,
                 keep_atom_mapping=self.keep_atom_mapping,
-                remove_brackets=self.remove_brackets,
                 remove_hydrogens=self.remove_hydrogens,
                 balance_rxn=self.balance_rxn,
                 kekulize=self.kekulize,
@@ -180,7 +169,6 @@ class RxnToSr:
 def rxn_to_sr(
     rxn_smi: str,
     keep_atom_mapping: bool = False,
-    remove_brackets: bool = False,
     remove_hydrogens: bool = False,
     balance_rxn: bool = False,
     kekulize: bool = False,
@@ -194,12 +182,13 @@ def rxn_to_sr(
 
     Args:
         rxn_smi (str): A reaction SMILES string in the format "reactant>>product".
-        keep_atom_mapping (bool): If True, atom map numbers will be removed in the
-            output SR-SMILES. Otherwise they will be retained (default).
-        remove_brackets (bool): If True, redundant square brackets will be removed
-            in the output SR-SMILES. Otherwise they will be kept (default).
-        remove_hydrogens (bool): If True, explicit hydrogens will be removed in the
-            output SR-SMILES. Otherwise they will be kept (default).
+        keep_atom_mapping (bool): If True, atom map numbers will be retained in the
+            output SR-SMILES. Otherwise they will be removed (default).
+        remove_hydrogens (bool): If True, removes hydrogens from the output SR-SMILES.
+            Automatically detects the hydrogen representation in the input:
+            - If hydrogens are individually mapped (e.g., [H:1]), removes unchanged
+              explicit hydrogens (those not involved in bond/charge/radical changes).
+            - If hydrogens are implicit (e.g., [CH3]), simplifies to bare atoms (C).
         balance_rxn (bool, optional): If True, attempts to balance the reaction
             before generating the SR. Defaults to False.
         kekulize (bool, optional): If True, converts all aromatic atoms/bonds into a
@@ -242,9 +231,11 @@ def rxn_to_sr(
                     "Set `balance_rxn=True` to apply automatic balancing before SR transformation"
                 )
 
-        # check if rxn_smi is fully atom mapped
-        # if not is_fully_atom_mapped(rxn_smi):
-        #     raise ValueError("The given rxn is not (fully) atom-mapped.")
+        # detect if hydrogens are individually mapped (e.g., [H:1]) or implicit (e.g., [CH3])
+        if remove_hydrogens:
+            has_explicit_h = has_individually_mapped_hydrogens(rxn_smi)
+        else:
+            False
 
         rxn_smi, smi_sr_scaffold, mol_reac, mol_prod, mol_sr = get_chirality_aligned_smiles_and_mols(
             rxn_smi, kekulize
@@ -253,12 +244,23 @@ def rxn_to_sr(
         replace_dict_atoms, replace_dict_bonds = extract_atom_and_bond_changes(mol_reac, mol_prod, mol_sr)
         smi_sr = build_sr_smiles(smi_sr_scaffold, replace_dict_atoms, replace_dict_bonds)
 
+        # Remove hydrogens based on detected representation
+        if remove_hydrogens and has_explicit_h:
+            # Remove explicit hydrogens that are not involved in any changes
+            unchanged_h_map_nums = get_unchanged_explicit_hydrogen_map_nums(
+                mol_reac, replace_dict_atoms, replace_dict_bonds
+            )
+            smi_sr = remove_explicit_hydrogens_from_sr_smiles(smi_sr, unchanged_h_map_nums)
+
         if not keep_atom_mapping:
             smi_sr = remove_atom_mapping(smi_sr)
 
-        if remove_brackets and remove_hydrogens:
+        # Always remove redundant brackets; also remove implicit H if requested
+        if remove_hydrogens and not has_explicit_h:
+            # Remove implicit hydrogens (e.g., [CH3] -> C) and redundant brackets
             smi_sr = remove_redundant_brackets_and_hydrogens(smi_sr)
-        elif remove_brackets:
+        else:
+            # Just remove redundant brackets (e.g., [C] -> C)
             smi_sr = remove_redundant_brackets(smi_sr)
 
         if not kekulize and not keep_aromatic_bonds:

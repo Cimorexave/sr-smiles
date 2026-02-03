@@ -44,6 +44,155 @@ ORGANIC_SUBSET = {
 }  # "*" is a "wildcard" or unknown atom
 
 
+def has_individually_mapped_hydrogens(smiles: str) -> bool:
+    """Check if a SMILES string contains individually mapped hydrogen atoms.
+
+    Detects patterns like [H:1], [H:2], etc. where hydrogen atoms have their own
+    atom map numbers, as opposed to implicit hydrogens like [CH3] or [NH2].
+
+    Args:
+        smiles (str): A SMILES or reaction SMILES string.
+
+    Returns:
+        bool: True if individually mapped hydrogens are found, False otherwise.
+
+    Example:
+        >>> has_individually_mapped_hydrogens("[C:1]([H:2])([H:3])[H:4]")
+        True
+        >>> has_individually_mapped_hydrogens("[CH3:1][OH:2]")
+        False
+    """
+    # Pattern matches [H:N] where N is a number (atom map)
+    # Also handles isotopes like [2H:1] or charges like [H+:1]
+    pattern = r"\[\d*H(?![a-zA-Z])[^:\]]*:\d+\]"
+    return bool(re.search(pattern, smiles))
+
+
+def get_stereo_atom_map_nums(smiles: str) -> List[int]:
+    """Extract atom map numbers for atoms with @ or @@ stereochemistry.
+
+    Args:
+        smiles (str): A SMILES string with atom mappings and stereochemistry.
+
+    Returns:
+        List[int]: Atom map numbers of atoms that have chiral centers (@ or @@).
+    """
+    pattern = r"@@?:(\d+)"
+    matches = re.findall(pattern, smiles)
+    return [int(m) for m in matches]
+
+
+def get_unchanged_explicit_hydrogen_map_nums(
+    mol_reac: Chem.Mol,
+    replace_dict_atoms: Dict[int, str],
+    replace_dict_bonds: Dict[Tuple[int, int], str],
+) -> set:
+    """Identify explicit hydrogen atoms that have no changes in the reaction.
+
+    Returns atom map numbers of hydrogen atoms that:
+    - Have no atom-level changes (no charge, radical, etc. changes)
+    - Have no bond-level changes (all bonds are unchanged)
+
+    Args:
+        mol_reac (Chem.Mol): The reactant molecule.
+        replace_dict_atoms (Dict[int, str]): Map of atom map number to SMARTS replacement.
+        replace_dict_bonds (Dict[Tuple[int, int], str]): Map of bond atom pairs to SMARTS.
+
+    Returns:
+        set: Atom map numbers of unchanged hydrogen atoms.
+    """
+    unchanged_h_map_nums = set()
+
+    for atom in mol_reac.GetAtoms():
+        if atom.GetAtomicNum() != 1:  # Not hydrogen
+            continue
+
+        map_num = atom.GetAtomMapNum()
+        if map_num == 0:
+            continue  # No atom mapping
+
+        # Check if atom has changes (contains {...|...} pattern indicating reac != prod)
+        atom_smarts = replace_dict_atoms.get(map_num, "")
+        if "{" in atom_smarts and "|" in atom_smarts:
+            continue  # Atom has changes, keep it
+
+        # Check if any bonds involving this hydrogen have changes
+        has_bond_change = False
+        for (begin_map, end_map), bond_smarts in replace_dict_bonds.items():
+            if map_num in (begin_map, end_map):
+                if "{" in bond_smarts and "|" in bond_smarts:
+                    has_bond_change = True
+                    break
+
+        if not has_bond_change:
+            unchanged_h_map_nums.add(map_num)
+
+    return unchanged_h_map_nums
+
+
+def remove_explicit_hydrogens_from_sr_smiles(sr_smiles: str, h_map_nums_to_remove: set) -> str:
+    """Remove explicit hydrogen atoms from SR SMILES by their atom map numbers.
+
+    Handles hydrogen atoms that appear as:
+    - Branch atoms: C([H:1])C  -> CC
+    - Chain atoms: [H:1]C -> C
+    - With bonds: C-[H:1] -> C
+
+    Args:
+        sr_smiles (str): The SR SMILES string.
+        h_map_nums_to_remove (set): Atom map numbers of hydrogens to remove.
+
+    Returns:
+        str: The SR SMILES with specified hydrogens removed.
+    """
+    if not h_map_nums_to_remove:
+        return sr_smiles
+
+    # Build a list of tokens
+    tokens = list(_tokenize(sr_smiles))
+    result_tokens = []
+    i = 0
+
+    while i < len(tokens):
+        tokentype, _, token = tokens[i]
+
+        # Check if this is a hydrogen atom to remove
+        if tokentype == TokenType.ATOM:
+            # Extract atom map number
+            match = re.search(r":(\d+)\]", token)
+            if match:
+                atom_map_num = int(match.group(1))
+                # Check if this is a hydrogen to remove (H atom with map num in remove set)
+                is_h_to_remove = atom_map_num in h_map_nums_to_remove and re.match(r"\[H:", token)
+
+                if is_h_to_remove:
+                    # Remove this hydrogen and handle surrounding structure
+                    # Check if previous token was a bond - remove it
+                    if result_tokens and result_tokens[-1][0] in (
+                        TokenType.BOND_TYPE,
+                        TokenType.EZSTEREO,
+                    ):
+                        result_tokens.pop()
+
+                    # Check if this H is alone in a branch - need to also remove ()
+                    # Look back for ( and forward for )
+                    if result_tokens and result_tokens[-1][0] == TokenType.BRANCH_START:
+                        # Check if next token is BRANCH_END
+                        if i + 1 < len(tokens) and tokens[i + 1][0] == TokenType.BRANCH_END:
+                            result_tokens.pop()  # Remove the (
+                            i += 2  # Skip the H and the )
+                            continue
+
+                    i += 1
+                    continue
+
+        result_tokens.append((tokentype, _, token))
+        i += 1
+
+    # Rebuild SMILES from tokens
+    return "".join(str(tok[2]) for tok in result_tokens)
+
+
 def remove_redundant_brackets_and_hydrogens(smi_sr: str) -> str:
     """Remove redundant square brackets and explicit hydrogens from an SR-SMILES string.
 

@@ -146,21 +146,21 @@ def transform_back():
     return SrToRxn()
 
 
-@pytest.fixture(params=["rxn_mapper", "graph_overlay", None], ids=str)
+@pytest.fixture(params=[True, False], ids=["rxnmapper", "no_mapper"])
 def forward_transformer(request):
-    """Forward RxnToSr transformer, parameterized by mapping method."""
-    return RxnToSr(mapping_method=request.param, keep_atom_mapping=True)
+    """Forward RxnToSr transformer, parameterized by use_rxnmapper."""
+    return RxnToSr(use_rxnmapper=request.param, keep_atom_mapping=True)
 
 
 @pytest.mark.parametrize("file_path, idx, rxn_smiles, rxn_col", subset_test_cases, ids=subset_ids)
-def test_RxnToSr_roundtrip_with_mapping_method(
+def test_RxnToSr_roundtrip_with_mapping(
     forward_transformer, transform_back, file_path, idx, rxn_smiles, rxn_col
 ):
-    """Ensure round-trip Rxn → SR → Rxn equivalence across mapping backends."""
+    """Ensure round-trip Rxn → SR → Rxn equivalence with/without RxnMapper."""
     sr = forward_transformer(rxn_smiles)
     rxn_back = transform_back(sr)
 
     assert are_equivalent_rxn_smiles(rxn_smiles, rxn_back), (
         f"Round-trip mismatch for sample {file_path}:{idx} "
-        f"using {forward_transformer.mapping_method} backend"
+        f"using use_rxnmapper={forward_transformer.use_rxnmapper}"
     )

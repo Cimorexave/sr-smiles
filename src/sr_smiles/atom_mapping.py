@@ -135,7 +135,7 @@ def add_atom_mapping(
         - RXNMapper may overwrite existing atom mapping, and performance may drop for unbalanced reactions.
         - Graph overlay mapping works for both balanced and unbalanced reactions.
     """
-    # TODO: introduce a hybrid approach, where we do rxn_mapper, but if the confidence is low, we do a rule-based mapping.  # noqa: E501
+    # TODO: introduce a hybrid approach, where we do rxnmapper, but if the confidence is low, we do a rule-based mapping.  # noqa: E501
 
     if method == "rxnmapper":
         logger.warning(

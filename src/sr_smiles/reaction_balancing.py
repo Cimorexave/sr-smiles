@@ -91,12 +91,12 @@ def is_rxn_mapped(rxn_smi: str) -> bool:
 #         return rxn_smi
 #     elif is_balanced and not is_mapped:
 #         # add atom mapping
-#         rxn_smi = add_atom_mapping(rxn_smi, method="graph_overlay")  # or rxn_mapper
+#         rxn_smi = add_atom_mapping(rxn_smi, method="graph_overlay")  # or rxnmapper
 #         return rxn_smi
 #     elif not is_balanced:
 #         # check if their is a partial mapping:
 #         # add a partial mapping
-#         rxn_smi = add_atom_mapping(rxn_smi, method="graph_overlay")  # or rxn_mapper
+#         rxn_smi = add_atom_mapping(rxn_smi, method="graph_overlay")  # or rxnmapper
 #         rxn_smi = balance_reaction(rxn_smi)
 #         return rxn_smi
 

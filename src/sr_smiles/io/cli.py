@@ -75,13 +75,11 @@ def main_rxn2sr():
     parser.add_argument("--rxn-col", default="rxn_smiles", help="Column name with reaction SMILES")
     parser.add_argument("--sr-col", default="sr_smiles", help="Name of new column for SR-SMILES")
     parser.add_argument("--keep-atom-mapping", action="store_true", help="Preserve atom mapping")
-    parser.add_argument("--remove-brackets", action="store_true", help="Remove brackets")
     parser.add_argument("--remove-hydrogens", action="store_true", help="Remove explicit hydrogens")
     parser.add_argument(
-        "--mapping-method",
-        default=None,
-        choices=["rxn_mapper", "graph_overlay", "identity"],
-        help="Select the atom‑mapping method to use. ",
+        "--use-rxn-mapper",
+        action="store_true",
+        help="Use RxnMapper for atom mapping before SR transformation",
     )
     parser.add_argument("--balance-rxn", action="store_true", help="Balance the given reaction")
     parser.add_argument("--product-based", action="store_true", help="Balance the given reaction")
@@ -116,6 +114,7 @@ def main_rxn2sr():
         rxn_col=args.rxn_col,
         kekulize=args.kekulize,
         keep_aromatic_bonds=args.keep_aromatic_bonds,
+        use_rxnmapper=args.use_rxnmapper,
     )
 
     tqdm.pandas()
