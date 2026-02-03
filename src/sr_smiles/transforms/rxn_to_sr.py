@@ -175,6 +175,8 @@ class RxnToSr:
 # TODO: do some checks according to our assumptions (atom mapping, balanced etc)
 # TODO: standardize atom order depending on unmapped reactants, then add mappings again. Make the sr molecule from this canonicalized reactant molecule to get maximum reproducibility  # noqa: E501
 # TODO: Make this also work for unbalanced rxns
+
+
 def rxn_to_sr(
     rxn_smi: str,
     keep_atom_mapping: bool = False,
