@@ -108,7 +108,6 @@ def main_rxn2sr():
     logger.info(f"🔄 Transforming column '{args.rxn_col}' → '{args.sr_col}' ...")
     transform = RxnToSr(
         keep_atom_mapping=args.keep_atom_mapping,
-        remove_brackets=args.remove_brackets,
         remove_hydrogens=args.remove_hydrogens,
         balance_rxn=args.balance_rxn,
         rxn_col=args.rxn_col,
