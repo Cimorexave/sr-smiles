@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main, clean-up-repo ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, clean-up-repo ]
+    branches: [ main ]
 
 jobs:
   setup:
