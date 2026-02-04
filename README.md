@@ -227,7 +227,7 @@ rxn2sr path/to/input.csv \              # required (input CSV)
     -o path/to/output.csv \             # optional output CSV
     --rxn-col rxn_smiles \              # name of the RXN SMILES column
     --sr-col sr_smiles \                # name of the new sr‑SMILES column
-    --use_rxnmapper \                   # use RXNMapper if rxns are unmapped
+    --use-rxnmapper \                   # use RXNMapper if rxns are unmapped
     --keep-atom-mapping \               # preserve atom mapping
     --balance-rxn                       # enable reaction balancing
 
