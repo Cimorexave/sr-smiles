@@ -3642,14 +3642,14 @@ test = ["Cython", "array-api-strict (>=2.3.1)", "asv", "gmpy2", "hypothesis (>=6
 name = "setuptools"
 version = "80.10.2"
 description = "Easily download, build, install, upgrade, and uninstall Python packages"
-optional = true
+optional = false
 python-versions = ">=3.9"
-groups = ["main"]
-markers = "extra == \"rxnmapper\" and platform_system == \"Linux\" and platform_machine == \"x86_64\" and python_version == \"3.9\" or extra == \"rxnmapper\" and python_version >= \"3.12\""
+groups = ["main", "dev"]
 files = [
     {file = "setuptools-80.10.2-py3-none-any.whl", hash = "sha256:95b30ddfb717250edb492926c92b5221f7ef3fbcc2b07579bcd4a27da21d0173"},
     {file = "setuptools-80.10.2.tar.gz", hash = "sha256:8b0e9d10c784bf7d262c4e5ec5d4ec94127ce206e8738f29a437945fbc219b70"},
 ]
+markers = {main = "python_version == \"3.9\" or python_version >= \"3.12\""}
 
 [package.extras]
 check = ["pytest-checkdocs (>=2.4)", "pytest-ruff (>=0.2.1) ; sys_platform != \"cygwin\"", "ruff (>=0.8.0) ; sys_platform != \"cygwin\""]
@@ -4379,4 +4379,4 @@ rxnmapper = ["rxnmapper"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.9"
-content-hash = "f25de6c061806a72486706674793fadeafa093f2ab8e94669464e944abec4670"
+content-hash = "9441999ce68d71b8029c28243cea14072bccca1dc1556be6f357f8b94be1401f"
