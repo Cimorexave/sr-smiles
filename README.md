@@ -35,7 +35,7 @@ a concept originating from graph‑based cheminformatics [[1]](#references).
 
 In a classical CGR, the reactant and product graphs of a chemical reactions are superimposed and represented as a single unified graph. Atoms common to both sides are merged, and bonds are annotated with their changes (e.g., “single → double”, “added”, or “removed”).
 
-sr‑SMILES brings this concept to the string domain, making it suitable for language modeling applications. Instead of representing reactions as separate reactants and products, SR‑SMILES combines them into a compact, local‑change‑aware representation that explicitly encodes how atoms and bonds transform.
+sr‑SMILES brings this concept to the string domain, making it suitable for language modeling applications. Instead of representing reactions as separate reactants and products, sr‑SMILES combines them into a compact, local‑change‑aware representation that explicitly encodes how atoms and bonds transform.
 It  is applicable to any organic reaction of the form `{reactant(s)}>>{product(s)}`.
 
 While atom mappings are required to perform the transformation, the library provides workarounds for unmapped or partially mapped reactions by integrating atom‑mapping tools such as `RXNMapper` [[2]](#references).
