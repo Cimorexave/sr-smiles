@@ -44,7 +44,7 @@ SR_TEST_CASES = list(zip(DF["rxn"], DF["rxn_smiles"], DF["sr_smiles"]))
 
 @pytest.mark.parametrize("rxn_id, rxn_smiles, sr_smiles", SR_TEST_CASES)
 def test_mapped_sr_to_rxn(rxn_id, rxn_smiles, sr_smiles):
-    """Check that SR (with mapping!) to RXN conversion reproduces the original reaction SMILES."""
+    """Check that sr (with mapping!) to RXN conversion reproduces the original reaction SMILES."""
     res1 = sr_to_rxn(sr_smiles)
     rxn2 = canonicalize(rxn_smiles)
     res2 = canonicalize(res1)
@@ -53,7 +53,7 @@ def test_mapped_sr_to_rxn(rxn_id, rxn_smiles, sr_smiles):
 
 @pytest.mark.parametrize("rxn_id, rxn_smiles, sr_smiles", SR_TEST_CASES)
 def test_unmapped_sr_to_rxn(rxn_id, rxn_smiles, sr_smiles):
-    """Check that SR (unmapped) to RXN conversion reproduces an equivalent to the original RXN SMILES."""
+    """Check that sr (unmapped) to RXN conversion reproduces an equivalent to the original RXN SMILES."""
     sr = rxn_to_sr(rxn_smiles, remove_hydrogens=True)
     assert not is_sr_smiles_fully_atom_mapped(sr)
 
@@ -99,13 +99,13 @@ def test_unmapped_sr_to_rxn(rxn_id, rxn_smiles, sr_smiles):
     ],
 )
 def test_add_atom_mapping_to_sr(sr, expected):
-    """Add atom mapping to an SR-SMILES."""
+    """Add atom mapping to an sr-SMILES."""
     assert add_atom_mapping_to_sr(sr) == expected
 
 
 def test_sr_to_rxn_invalid_smiles(propagated_logger, caplog):
-    """Verify that invalid SR-SMILES input logs a warning and returns an empty string."""
-    bad_smi = "INVALID-SR-SMILES"
+    """Verify that invalid sr-SMILES input logs a warning and returns an empty string."""
+    bad_smi = "INVALID-sr-SMILES"
 
     with caplog.at_level("WARNING", logger=propagated_logger.name):
         result = sr_to_rxn(bad_smi)
@@ -115,7 +115,7 @@ def test_sr_to_rxn_invalid_smiles(propagated_logger, caplog):
 
     record = caplog.records[0]
     assert record.levelname == "WARNING"
-    assert "Failed to process SR-SMILES" in record.message, record.message
+    assert "Failed to process sr-SMILES" in record.message, record.message
     # assert "Returning empty string." in record.message
 
 
@@ -175,7 +175,7 @@ E_Z_STEREO_CASES = e_z_stereo_test_cases()
 
 @pytest.mark.parametrize("idx, rxn_smiles, sr_smiles", E_Z_STEREO_CASES)
 def test_sr_to_rxn_e_z_stereo(idx, rxn_smiles, sr_smiles):
-    """Check that E/Z stereochemistry is correctly preserved in RXN->SR->RXN conversion."""
+    """Check that E/Z stereochemistry is correctly preserved in RXN->sr->RXN conversion."""
     result = sr_to_rxn(sr_smiles)
     can_res = canonicalize(result)
     can_rxn = canonicalize(rxn_smiles)
@@ -224,7 +224,7 @@ def test_remove_bonds_by_atom_map_nums_invalid_key():
 def test_update_chirality_tags_without_flip():
     """Test that chirality is preserved when the neighbor order implies no flip.
 
-    The chirality in the SMILES and SR scaffold differs in tag (@ vs @@),
+    The chirality in the SMILES and sr scaffold differs in tag (@ vs @@),
     but the neighbor order leads to an even permutation, so no flip is needed.
     The original SMILES should be returned unchanged.
     """
@@ -239,7 +239,7 @@ def test_update_chirality_tags_without_flip():
 def test_update_chirality_tags_with_flip():
     """Test that chirality tag is flipped when the neighbor order implies inversion.
 
-    The input SMILES has a '@' tag, and the SR scaffold has '@',
+    The input SMILES has a '@' tag, and the sr scaffold has '@',
     but the neighbor order is an odd permutation, so chirality must be flipped.
     The output should have '@@' instead of '@'.
     """
@@ -346,7 +346,7 @@ def test_update_e_z_stereo_chem_with_disconnected_molecule():
 
 
 def test_get_reac_prod_scaffold_smiles_from_sr():
-    """Tests parsing of an SR string into reactant and product scaffold SMILES."""
+    """Tests parsing of an sr string into reactant and product scaffold SMILES."""
     sr = "{[O:1]|[O+:1]}{=|#}{[C:2]|[C-:2]}1{-|~}[C:3](#[C:4][H:6]){~|-}[H:5]{-|~}1"
 
     expected_reac = "[O:1]=[C:2]1-[C:3](#[C:4][H:6])~[H:5]-1"
@@ -378,7 +378,7 @@ def test_get_chiral_center_map_nums_no_chirality():
 
 
 def test_SrToRxn_single_string():
-    """Test SrToRxn class for single SR-SMILES."""
+    """Test SrToRxn class for single sr-SMILES."""
     transform = SrToRxn()
     sr_smiles = DF.iloc[0]["sr_smiles"]
     exp_output = DF.iloc[0]["rxn_smiles"]
@@ -389,7 +389,7 @@ def test_SrToRxn_single_string():
 
 
 def test_SrToRxn_list_of_strings():
-    """Test SrToRxn class for a list of SR-SMILES."""
+    """Test SrToRxn class for a list of sr-SMILES."""
     transform = SrToRxn()
     sr_smiles = DF["sr_smiles"].tolist()
     exp_output = DF["rxn_smiles"].tolist()
@@ -432,7 +432,7 @@ def test_SrToRxn_pd_df():
 def test_dataframe_without_sr_col_raises():
     """Test that SrToRxn raises ValueError if `self.sr_col` not set."""
     transform = SrToRxn()
-    df = pd.DataFrame({"sr": ["SR>>SMILES"]})
+    df = pd.DataFrame({"sr": ["sr>>SMILES"]})
     with pytest.raises(ValueError, match="`self.sr_col` is not set"):
         transform(df)
 
@@ -477,7 +477,7 @@ def test_SrToRxn_empty_inputs(empty_input, expected_type):
     ],
 )
 def test_is_sr_smiles_fully_atom_mapped(sr_smiles, is_fully_mapped):
-    """Check if an SR-SMILES is fully atom-mapped."""
+    """Check if an sr-SMILES is fully atom-mapped."""
     assert is_sr_smiles_fully_atom_mapped(sr_smiles) == is_fully_mapped
 
 
@@ -498,7 +498,7 @@ def test_sr_to_rxn_do_not_keep_atom_mapping():
 
 
 def test_sr_to_rxn_in_kekule_form():
-    """Check SR to RXN conversion on a non-aromatic SR string."""
+    """Check sr to RXN conversion on a non-aromatic sr string."""
     sr = "C1(C(C)=O)=CC=C2C(=C1)C=CN2{-|~}C(=O)(OC(C)(C)C){~|-}O"
     r, p = sr_to_rxn(sr).split(">>")
 
@@ -510,7 +510,7 @@ def test_sr_to_rxn_in_kekule_form():
 
 
 def test_sr_to_rxn_sr_not_in_kekule_form():
-    """Check SR to RXN conversion on an aromatic SR string."""
+    """Check sr to RXN conversion on an aromatic sr string."""
     sr = "c1(C(C)=O)ccc2c(c1){c|C}{:|=}{c|C}{n|N}2{-|~}C(=O)(OC(C)(C)C){~|-}O"
     r, p = sr_to_rxn(sr).split(">>")
 
@@ -546,5 +546,5 @@ def test_is_rxn_smiles_kekule(smiles, kekule):
     ],
 )
 def test_is_sr_smiles_kekule(smiles, kekule):
-    """Check if a given SR-SMILES is kekulized."""
+    """Check if a given sr-SMILES is kekulized."""
     assert is_kekule(smiles) == kekule
