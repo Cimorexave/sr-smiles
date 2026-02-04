@@ -31,7 +31,6 @@ pre-commit = "^4.3.0"
 ruff = "^0.12.10"
 mypy = "^1.17.1"
 pytest-cov = "^6.2.1"
-setuptools = "<81"
 
 [tool.ruff.lint]
 select = [
