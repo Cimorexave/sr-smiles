@@ -9,15 +9,13 @@
 <!-- [![Coverage](https://codecov.io/gh/heid-lab/sr-smiles/branch/main/graph/badge.svg)](https://codecov.io/gh/heid-lab/sr-smiles) -->
 <!-- [![Downloads](https://img.shields.io/github/downloads/heid-lab/sr-smiles/total.svg)](https://github.com/heid-lab/sr-smiles/releases) -->
 
-</div>
+</div align="center">
 
 [Overview](#overview) | [Installation](#installation) | [Usage](#usage) | [Contributing](#contributing) | [Citation](#citation) | [References](#references)
 
 </div>
 
-Note: This repository is not yet public and not yet on PyPI, hence the installation is not yet possible via pip. [WIP]
-
-# Superimposed reaction (sr) SMILES
+# sr-SMILES: Superimposed Reaction SMILES
 
 <!-- TODO: Add a banner -->
 
@@ -243,12 +241,16 @@ sr2rxn output_sr.csv \                  # required (input CSV)
 
 ## Contributing
 
-[WIP]
+🤝 Contributions are welcome! Here's how to get started:
 
-🤝 We welcome contributions!
-For development installation and guidelines, see [CONTRIBUTE.md](CONTRIBUTE.md).
-
-While the transformations have been tested across various datasets and scenarios, edge cases can always arise. If you encounter an issue or discover a case that doesn’t behave as expected, please open a pull request or issue, and we’ll be happy to investigate and get back to you as soon as possible 🦠✨🚀
+- **Report bugs or edge cases** by opening an [issue](https://github.com/heid-lab/sr-smiles/issues).
+- **Submit fixes or features** via a pull request.
+- **For local development**, clone the repo and install with dev dependencies:
+  ```bash
+  git clone https://github.com/heid-lab/sr-smiles.git
+  cd sr-smiles
+  poetry install --with dev
+  pre-commit install
 
 ---
 
