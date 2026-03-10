@@ -7,7 +7,6 @@
 [![License](https://img.shields.io/github/license/heid-lab/sr-smiles)](https://github.com/heid-lab/sr-smiles/blob/main/LICENSE)
 [![Test](https://github.com/heid-lab/sr-smiles/actions/workflows/ci.yml/badge.svg)](https://github.com/heid-lab/sr-smiles/actions)
 <!-- [![Coverage](https://codecov.io/gh/heid-lab/sr-smiles/branch/main/graph/badge.svg)](https://codecov.io/gh/heid-lab/sr-smiles) -->
-
 <!-- [![Downloads](https://img.shields.io/github/downloads/heid-lab/sr-smiles/total.svg)](https://github.com/heid-lab/sr-smiles/releases) -->
 
 </div>
@@ -58,8 +57,6 @@ Let's take a look at an example:
 <!-- TODO: Add dependencies section -->
 
 ## Installation
-
-[WIP]
 
 ```bash
 pip install sr-smiles
